@@ -47,7 +47,14 @@ pve_network_preserved_ips = cfg.proxmox_network_preserved_ips
 pve_network_preserved_ips.append(pve_network_gw)
 log.debug("pve_network_preserved_ips", pve_network_preserved_ips)
 
-vm_list = xlient.nodes(cfg.proxmox_node).qemu.get()
+vm_list_response = xlient.nodes(cfg.proxmox_node).qemu.get()
+vm_list = []
+for vm in vm_list_response:
+    vmid = vm["vmid"]
+    if (vmid >= cfg.proxmox_vm_id_range[0]
+            and vmid <= cfg.proxmox_vm_id_range[1]):
+        vm_list.append(vm)
+
 log.debug("len(vm_list)", len(vm_list))
 exist_vm_id = set()
 exist_vm_ip = set()
