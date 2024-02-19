@@ -14,9 +14,9 @@ from app.logger import Logger
 from app.config import profiles
 from app import util
 
+config.load_kube_config()
 urllib3.disable_warnings()
 
-config.load_kube_config()
 config_path = os.getenv("CONFIG_PATH")
 
 if not config_path:
@@ -34,22 +34,20 @@ xlient = ProxmoxAPI(
     verify_ssl=False,  # TODO: verify later with ca cert
 )
 
-pve_network_response = xlient.nodes(cfg.proxmox_node).network(
-    cfg.proxmox_vm_network).get()
-pve_network_interface = ipaddress.IPv4Interface(pve_network_response["cidr"])
-pve_network_gw = str(
-    pve_network_interface.ip) or pve_network_response["address"]
+r = xlient.nodes(cfg.proxmox_node).network(cfg.proxmox_vm_network).get()
+pve_network_interface = ipaddress.IPv4Interface(r["cidr"])
+pve_network_gw = str(pve_network_interface.ip) or r["address"]
 pve_network = pve_network_interface.network
-pve_vm_ip_pool = []
+vm_ip_pool = []
 for ip in pve_network.hosts():
-    pve_vm_ip_pool.append(str(ip))
+    vm_ip_pool.append(str(ip))
 pve_network_preserved_ips = cfg.proxmox_network_preserved_ips
 pve_network_preserved_ips.append(pve_network_gw)
 log.debug("pve_network_preserved_ips", pve_network_preserved_ips)
 
-vm_list_response = xlient.nodes(cfg.proxmox_node).qemu.get()
+r = xlient.nodes(cfg.proxmox_node).qemu.get()
 vm_list = []
-for vm in vm_list_response:
+for vm in r:
     vmid = vm["vmid"]
     if (vmid >= cfg.proxmox_vm_id_range[0]
             and vmid <= cfg.proxmox_vm_id_range[1]):
@@ -77,31 +75,30 @@ if not newid:
 log.debug("newid", newid)
 
 log.debug("exist_vm_ip", exist_vm_ip)
-new_ip = util.find_missing(pve_vm_ip_pool, exist_vm_ip)
+new_ip = util.find_missing(vm_ip_pool, exist_vm_ip)
 if not new_ip:
     log.debug("Error: can't find new ip")
     exit(1)
 log.debug("new_ip", new_ip)
 
-clone_respone = xlient.nodes(cfg.proxmox_node).qemu(
+r = xlient.nodes(cfg.proxmox_node).qemu(
     cfg.proxmox_template_vm_id).clone.post(newid=newid)
-log.debug("clone", clone_respone)
+log.debug("clone", r)
 
-edit_vm_respone = xlient.nodes(cfg.proxmox_node).qemu(newid).config.put(
+r = xlient.nodes(cfg.proxmox_node).qemu(newid).config.put(
     name=f"{cfg.proxmox_vm_name_prefix}{newid}",
     ciuser="u",
     cipassword="1",
     agent="enabled=1,fstrim_cloned_disks=1",
     ipconfig0=f"ip={new_ip}/24,gw={pve_network_gw}")
-log.debug("edit", edit_vm_respone)
+log.debug("edit", r)
 
-resize_disk_response = xlient.nodes(cfg.proxmox_node).qemu(newid).resize.put(
-    disk="scsi0", size="+20G")
-log.debug("resize", resize_disk_response)
+r = xlient.nodes(cfg.proxmox_node).qemu(newid).resize.put(disk="scsi0",
+                                                          size="+20G")
+log.debug("resize_disk", r)
 
-start_vm_response = xlient.nodes(
-    cfg.proxmox_node).qemu(newid).status.start.post()
-log.debug("start_vm", start_vm_response)
+r = xlient.nodes(cfg.proxmox_node).qemu(newid).status.start.post()
+log.debug("start_vm", r)
 
 # TODO: find a better way: first boot command, or interval poll checking if node is ready
 time.sleep(3 * 60)
@@ -136,10 +133,10 @@ join_command = [
     "--discovery-token-ca-cert-hash",
     f"sha256:{cfg.kubernetes_discovery_token_ca_cert_hash}",
 ]
-exec_response = (xlient.nodes(
+r = (xlient.nodes(
     cfg.proxmox_node).qemu(newid).agent.exec.post(command=join_command))
-log.debug("exec_response", exec_response)
-pid = exec_response.get("pid", None)
+log.debug("exec_response", r)
+pid = r.get("pid", None)
 if not pid:
     log.debug("Unknown status")
     exit(1)
