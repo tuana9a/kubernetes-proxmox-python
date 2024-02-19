@@ -100,8 +100,24 @@ log.debug("resize_disk", r)
 r = xlient.nodes(cfg.proxmox_node).qemu(newid).status.start.post()
 log.debug("start_vm", r)
 
-# TODO: find a better way: first boot command, or interval poll checking if node is ready
-time.sleep(3 * 60)
+status = None
+timeout = 5 * 60
+duration = 0
+interval_check = 5
+
+while True:
+    if duration > timeout:
+        log.debug("timeout reached")
+        exit(1)
+    try:
+        r = xlient.nodes(cfg.proxmox_node).qemu(newid).agent.ping.post()
+        log.debug("guest-agent: ready")
+        break
+    except Exception as err:
+        log.debug(err)
+    log.debug("guest-agent: wait to be ready")
+    time.sleep(interval_check)
+    duration += interval_check
 
 token_id = util.KubeUtil.gen_token_id()
 token_secret = util.KubeUtil.gen_token_secret()
