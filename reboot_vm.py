@@ -12,7 +12,7 @@ from app.config import profiles
 urllib3.disable_warnings()
 
 config_path = os.getenv("CONFIG_PATH")
-target_vmid = os.getenv("VMID")
+target_vm_id = os.getenv("VMID")
 
 if not config_path:
     raise ValueError("env: CONFIG_PATH is missing")
@@ -30,7 +30,7 @@ xlient = ProxmoxAPI(
 )
 
 try:
-    r = xlient.nodes(cfg.proxmox_node).qemu(target_vmid).status.reboot.post()
+    r = xlient.nodes(cfg.proxmox_node).qemu(target_vm_id).status.reboot.post()
     log.debug("reboot", r)
 except Exception as err:
     log.debug(err)

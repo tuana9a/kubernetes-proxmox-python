@@ -14,7 +14,7 @@ config.load_kube_config()
 urllib3.disable_warnings()
 
 config_path = os.getenv("CONFIG_PATH")
-target_vmid = os.getenv("VMID")
+target_vm_id = os.getenv("VMID")
 
 if not config_path:
     raise ValueError("env: CONFIG_PATH is missing")
@@ -34,20 +34,19 @@ xlient = ProxmoxAPI(
 r = xlient.nodes(cfg.proxmox_node).qemu.get()
 vm_list = []
 for vm in r:
-    vmid = vm["vmid"]
-    if (vmid >= cfg.proxmox_vm_id_range[0]
-            and vmid <= cfg.proxmox_vm_id_range[1]):
+    vm_id = vm["vmid"]
+    if (vm_id >= cfg.proxmox_vm_id_begin and vm_id <= cfg.proxmox_vm_id_end):
         vm_list.append(vm)
 
 target_vm = None
 log.debug("len(vm_list)", len(vm_list))
 for vm in vm_list:
-    vmid = vm["vmid"]
-    if str(vmid) == str(target_vmid):
+    vm_id = vm["vmid"]
+    if str(vm_id) == str(target_vm_id):
         target_vm = vm
 
 if not target_vm:
-    log.debug("vmid", target_vmid, "not found")
+    log.debug("vmid", target_vm_id, "not found")
     exit(1)
 
 log.debug("vm", target_vm)
@@ -57,7 +56,7 @@ try:
 except Exception as err:
     log.debug(err)
 
-r = xlient.nodes(cfg.proxmox_node).qemu(target_vmid).status.shutdown.post()
+r = xlient.nodes(cfg.proxmox_node).qemu(target_vm_id).status.shutdown.post()
 log.debug("shutdown", r)
 
 status = None
@@ -69,7 +68,7 @@ while True:
     if duration > timeout:
         log.debug("shutdown timeout reached")
         exit(1)
-    r = xlient.nodes(cfg.proxmox_node).qemu(target_vmid).status.current.get()
+    r = xlient.nodes(cfg.proxmox_node).qemu(target_vm_id).status.current.get()
     status = r["status"]
     if status == "stopped":
         break
@@ -77,5 +76,5 @@ while True:
     time.sleep(interval_check)
     duration += interval_check
 
-r = xlient.nodes(cfg.proxmox_node).qemu(target_vmid).delete()
+r = xlient.nodes(cfg.proxmox_node).qemu(target_vm_id).delete()
 log.debug("delete", r)

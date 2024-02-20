@@ -17,6 +17,8 @@ class Cfg:
                  proxmox_node: str,
                  proxmox_template_vm_id: str,
                  proxmox_vm_network: str,
+                 proxmox_vm_username: str = "u",
+                 proxmox_vm_password: str = "1",
                  proxmox_vm_id_range: List[int] = [0, 9999],
                  proxmox_vm_ssh_keys: Optional[str] = "",
                  proxmox_vm_name_prefix: Optional[str] = "i-",
@@ -29,7 +31,11 @@ class Cfg:
         self.proxmox_password = proxmox_password
         self.proxmox_node = proxmox_node
         self.proxmox_template_vm_id = proxmox_template_vm_id
+        self.proxmox_vm_username = proxmox_vm_username
+        self.proxmox_vm_password = proxmox_vm_password
         self.proxmox_vm_id_range = proxmox_vm_id_range
+        self.proxmox_vm_id_begin = self.proxmox_vm_id_range[0]
+        self.proxmox_vm_id_end = self.proxmox_vm_id_range[1]
         self.proxmox_vm_network = proxmox_vm_network
         self.proxmox_vm_ssh_keys = proxmox_vm_ssh_keys
         self.proxmox_vm_name_prefix = proxmox_vm_name_prefix

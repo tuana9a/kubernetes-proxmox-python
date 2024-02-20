@@ -12,7 +12,7 @@ from app.config import profiles
 urllib3.disable_warnings()
 
 config_path = os.getenv("CONFIG_PATH")
-target_vmid = os.getenv("VMID")
+target_vm_id = os.getenv("VMID")
 
 if not config_path:
     raise ValueError("env: CONFIG_PATH is missing")
@@ -30,7 +30,8 @@ xlient = ProxmoxAPI(
 )
 
 try:
-    r = xlient.nodes(cfg.proxmox_node).qemu(target_vmid).status.shutdown.post()
+    r = xlient.nodes(
+        cfg.proxmox_node).qemu(target_vm_id).status.shutdown.post()
     log.debug("shutdown", r)
 except Exception as err:
     log.debug(err)
@@ -44,7 +45,7 @@ while True:
     if duration > timeout:
         log.debug("timeout reached")
         exit(1)
-    r = xlient.nodes(cfg.proxmox_node).qemu(target_vmid).status.current.get()
+    r = xlient.nodes(cfg.proxmox_node).qemu(target_vm_id).status.current.get()
     status = r["status"]
     if status == "stopped":
         break

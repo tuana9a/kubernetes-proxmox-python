@@ -48,9 +48,8 @@ log.debug("pve_network_preserved_ips", pve_network_preserved_ips)
 r = xlient.nodes(cfg.proxmox_node).qemu.get()
 vm_list = []
 for vm in r:
-    vmid = vm["vmid"]
-    if (vmid >= cfg.proxmox_vm_id_range[0]
-            and vmid <= cfg.proxmox_vm_id_range[1]):
+    vm_id = vm["vmid"]
+    if (vm_id >= cfg.proxmox_vm_id_begin and vm_id <= cfg.proxmox_vm_id_end):
         vm_list.append(vm)
 
 log.debug("len(vm_list)", len(vm_list))
@@ -58,21 +57,21 @@ exist_vm_id = set()
 exist_vm_ip = set()
 exist_vm_ip.update(pve_network_preserved_ips)
 for vm in vm_list:
-    vmid = vm["vmid"]
-    exist_vm_id.add(vmid)
-    vm_config = xlient.nodes(cfg.proxmox_node).qemu(vmid).config.get()
+    vm_id = vm["vmid"]
+    exist_vm_id.add(vm_id)
+    vm_config = xlient.nodes(cfg.proxmox_node).qemu(vm_id).config.get()
     ifconfig0 = vm_config.get("ipconfig0", None)
     if not ifconfig0: continue
     vm_ip = util.ProxmoxUtil.extract_ip(ifconfig0)
     if vm_ip: exist_vm_ip.add(vm_ip)
 
 log.debug("exist_vm_id", exist_vm_id)
-newid = util.find_missing_number(cfg.proxmox_vm_id_range[0],
-                                 cfg.proxmox_vm_id_range[1], exist_vm_id)
-if not newid:
+new_id = util.find_missing_number(cfg.proxmox_vm_id_begin,
+                                  cfg.proxmox_vm_id_end, exist_vm_id)
+if not new_id:
     log.debug("Error: can't find new id")
     exit(1)
-log.debug("newid", newid)
+log.debug("newid", new_id)
 
 log.debug("exist_vm_ip", exist_vm_ip)
 new_ip = util.find_missing(vm_ip_pool, exist_vm_ip)
@@ -82,22 +81,22 @@ if not new_ip:
 log.debug("new_ip", new_ip)
 
 r = xlient.nodes(cfg.proxmox_node).qemu(
-    cfg.proxmox_template_vm_id).clone.post(newid=newid)
+    cfg.proxmox_template_vm_id).clone.post(newid=new_id)
 log.debug("clone", r)
 
-r = xlient.nodes(cfg.proxmox_node).qemu(newid).config.put(
-    name=f"{cfg.proxmox_vm_name_prefix}{newid}",
-    ciuser="u",
-    cipassword="1",
+r = xlient.nodes(cfg.proxmox_node).qemu(new_id).config.put(
+    name=f"{cfg.proxmox_vm_name_prefix}{new_id}",
+    ciuser=cfg.proxmox_vm_username,
+    cipassword=cfg.proxmox_vm_password,
     agent="enabled=1,fstrim_cloned_disks=1",
     ipconfig0=f"ip={new_ip}/24,gw={pve_network_gw}")
 log.debug("edit", r)
 
-r = xlient.nodes(cfg.proxmox_node).qemu(newid).resize.put(disk="scsi0",
-                                                          size="+20G")
+r = xlient.nodes(cfg.proxmox_node).qemu(new_id).resize.put(disk="scsi0",
+                                                           size="+20G")
 log.debug("resize_disk", r)
 
-r = xlient.nodes(cfg.proxmox_node).qemu(newid).status.start.post()
+r = xlient.nodes(cfg.proxmox_node).qemu(new_id).status.start.post()
 log.debug("start_vm", r)
 
 status = None
@@ -110,12 +109,11 @@ while True:
         log.debug("timeout reached")
         exit(1)
     try:
-        r = xlient.nodes(cfg.proxmox_node).qemu(newid).agent.ping.post()
-        log.debug("guest-agent: ready")
+        r = xlient.nodes(cfg.proxmox_node).qemu(new_id).agent.ping.post()
+        log.debug("guest-agent is ready")
         break
     except Exception as err:
-        log.debug(err)
-    log.debug("guest-agent: wait to be ready")
+        log.debug("guest-agent", err)
     time.sleep(interval_check)
     duration += interval_check
 
@@ -150,7 +148,7 @@ join_command = [
     f"sha256:{cfg.kubernetes_discovery_token_ca_cert_hash}",
 ]
 r = (xlient.nodes(
-    cfg.proxmox_node).qemu(newid).agent.exec.post(command=join_command))
+    cfg.proxmox_node).qemu(new_id).agent.exec.post(command=join_command))
 log.debug("exec_response", r)
 pid = r.get("pid", None)
 if not pid:
@@ -163,7 +161,7 @@ pid_stdout = None
 pid_exitcode = None
 while not pid_exited:
     status = xlient.nodes(
-        cfg.proxmox_node).qemu(newid).agent("exec-status").get(pid=pid)
+        cfg.proxmox_node).qemu(new_id).agent("exec-status").get(pid=pid)
     pid_exited = status["exited"]
     pid_stdout = status.get("out-data", None)
     pid_exitcode = status.get("exitcode", None)
