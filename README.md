@@ -32,8 +32,8 @@ apt-get install -y libguestfs-tools
 IMAGE_FILE=bionic-server-cloudimg-amd64.img
 wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img -O $PWD/$IMAGE_FILE
 virt-customize -a $IMAGE_FILE --install qemu-guest-agent
-virt-customize -a $IMAGE_FILE --run install-kube.sh
-virt-customize -a $IMAGE_FILE --copy-in $PWD/containerd/config.toml:/etc/containerd/
+virt-customize -a $IMAGE_FILE --run install-kube.sh # See ./examples/install-kube.sh
+virt-customize -a $IMAGE_FILE --copy-in $PWD/containerd/config.toml:/etc/containerd/ # See ./examples/containerd/config.toml
 
 NETWORK=vmbr56 # TODO: your network
 TEMPLATE_VM_ID=9000
@@ -65,6 +65,8 @@ openssl x509 -in /etc/kubernetes/pki/ca.crt -noout -pubkey | openssl rsa -pubin 
 ```bash
 cat ~/.kube/config | grep certificate-authority-data | awk '{ print $2 }' | base64 --decode | openssl x509 -noout -pubkey | openssl rsa -pubin -outform DER 2>/dev/null | sha256sum | awk '{print $1}'
 ```
+
+See `./examples/config.json`
 
 # Add vm
 
