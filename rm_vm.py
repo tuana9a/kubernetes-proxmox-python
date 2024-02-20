@@ -54,7 +54,7 @@ log.debug("vm", target_vm)
 try:
     klient.CoreV1Api().delete_node(target_vm["name"])
 except Exception as err:
-    log.debug(err)
+    log.debug("rm_node", err)
 
 r = xlient.nodes(cfg.proxmox_node).qemu(target_vm_id).status.shutdown.post()
 log.debug("shutdown", r)
@@ -68,10 +68,14 @@ while True:
     if duration > timeout:
         log.debug("shutdown timeout reached")
         exit(1)
-    r = xlient.nodes(cfg.proxmox_node).qemu(target_vm_id).status.current.get()
-    status = r["status"]
-    if status == "stopped":
-        break
+    try:
+        r = xlient.nodes(
+            cfg.proxmox_node).qemu(target_vm_id).status.current.get()
+        status = r["status"]
+        if status == "stopped":
+            break
+    except Exception as err:
+        log.debug("shutdown", err)
     log.debug("wait for vm to stop")
     time.sleep(interval_check)
     duration += interval_check

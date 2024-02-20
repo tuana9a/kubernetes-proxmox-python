@@ -89,7 +89,9 @@ r = xlient.nodes(cfg.proxmox_node).qemu(new_id).config.put(
     ciuser=cfg.proxmox_vm_username,
     cipassword=cfg.proxmox_vm_password,
     agent="enabled=1,fstrim_cloned_disks=1",
-    ipconfig0=f"ip={new_ip}/24,gw={pve_network_gw}")
+    net0=f"virtio,bridge={cfg.proxmox_vm_network}",
+    ipconfig0=f"ip={new_ip}/24,gw={pve_network_gw}",
+)
 log.debug("edit", r)
 
 r = xlient.nodes(cfg.proxmox_node).qemu(new_id).resize.put(disk="scsi0",
