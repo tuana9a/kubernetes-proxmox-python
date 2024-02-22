@@ -10,16 +10,20 @@ from app.logger import Logger
 from app.config import profiles
 
 urllib3.disable_warnings()
+log = Logger.DEBUG
 
 config_path = os.getenv("CONFIG_PATH")
+log.debug("config_path", config_path)
 target_vm_id = os.getenv("VMID")
+log.debug("target_vm_id", target_vm_id)
 
+if not target_vm_id:
+    raise ValueError("env: VMID is missing")
 if not config_path:
     raise ValueError("env: CONFIG_PATH is missing")
 if not os.path.exists(config_path):
     raise FileNotFoundError(config_path)
 
-log = Logger.DEBUG
 profiles.load_from_file(config_path=config_path)
 cfg = profiles.get_selected()
 xlient = ProxmoxAPI(

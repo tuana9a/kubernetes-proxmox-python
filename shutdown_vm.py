@@ -10,16 +10,20 @@ from app.logger import Logger
 from app.config import profiles
 
 urllib3.disable_warnings()
+log = Logger.DEBUG
 
 config_path = os.getenv("CONFIG_PATH")
+log.debug("config_path", config_path)
 target_vm_id = os.getenv("VMID")
+log.debug("target_vm_id",target_vm_id)
 
+if not target_vm_id:
+    raise ValueError("env: VMID is missing")
 if not config_path:
     raise ValueError("env: CONFIG_PATH is missing")
 if not os.path.exists(config_path):
     raise FileNotFoundError(config_path)
 
-log = Logger.DEBUG
 profiles.load_from_file(config_path=config_path)
 cfg = profiles.get_selected()
 xlient = ProxmoxAPI(
@@ -40,8 +44,10 @@ status = None
 timeout = 5 * 60
 duration = 0
 interval_check = 5
-
 while True:
+    log.debug("wait for vm to stop")
+    time.sleep(interval_check)
+    duration += interval_check
     if duration > timeout:
         log.debug("timeout reached")
         exit(1)
@@ -49,6 +55,3 @@ while True:
     status = r["status"]
     if status == "stopped":
         break
-    log.debug("wait for vm to stop")
-    time.sleep(interval_check)
-    duration += interval_check

@@ -4,6 +4,7 @@ import os
 import time
 import urllib3
 import ipaddress
+import urllib.parse
 
 from proxmoxer import ProxmoxAPI
 from kubernetes import config, client as klient
@@ -16,15 +17,16 @@ from app import util
 
 config.load_kube_config()
 urllib3.disable_warnings()
+log = Logger.DEBUG
 
 config_path = os.getenv("CONFIG_PATH")
+log.debug("config_path", config_path)
 
 if not config_path:
     raise ValueError("env: CONFIG_PATH is missing")
 if not os.path.exists(config_path):
     raise FileNotFoundError(config_path)
 
-log = Logger.DEBUG
 profiles.load_from_file(config_path=config_path)
 cfg = profiles.get_selected()
 xlient = ProxmoxAPI(
@@ -88,6 +90,7 @@ r = xlient.nodes(cfg.proxmox_node).qemu(new_id).config.put(
     name=f"{cfg.proxmox_vm_name_prefix}{new_id}",
     ciuser=cfg.proxmox_vm_username,
     cipassword=cfg.proxmox_vm_password,
+    sshkeys=urllib.parse.quote(cfg.proxmox_vm_ssh_keys, safe=""), # NOTE: https://github.com/proxmoxer/proxmoxer/issues/153
     agent="enabled=1,fstrim_cloned_disks=1",
     net0=f"virtio,bridge={cfg.proxmox_vm_network}",
     ipconfig0=f"ip={new_ip}/24,gw={pve_network_gw}",
@@ -104,7 +107,7 @@ log.debug("start_vm", r)
 status = None
 timeout = 5 * 60
 duration = 0
-interval_check = 5
+interval_check = 10
 
 while True:
     if duration > timeout:
@@ -149,6 +152,7 @@ join_command = [
     "--discovery-token-ca-cert-hash",
     f"sha256:{cfg.kubernetes_discovery_token_ca_cert_hash}",
 ]
+log.debug(" ".join(join_command))
 r = (xlient.nodes(
     cfg.proxmox_node).qemu(new_id).agent.exec.post(command=join_command))
 log.debug("exec_response", r)
@@ -160,14 +164,18 @@ log.debug("pid", pid)
 
 pid_exited = 0
 pid_stdout = None
+pid_stderr = None
 pid_exitcode = None
+interval_check = 10
 while not pid_exited:
+    time.sleep(interval_check)
     status = xlient.nodes(
         cfg.proxmox_node).qemu(new_id).agent("exec-status").get(pid=pid)
     pid_exited = status["exited"]
     pid_stdout = status.get("out-data", None)
+    pid_stderr = status.get("err-data", None)
     pid_exitcode = status.get("exitcode", None)
-    time.sleep(5)
 
 log.debug("exitcode", pid_exitcode)
-log.debug(pid_stdout)
+log.debug("pid_stdout", pid_stdout)
+log.debug("pid_stderr", pid_stderr)
