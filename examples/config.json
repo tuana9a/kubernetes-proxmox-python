@@ -1,0 +1,23 @@
+{
+    "proxmox_node": "pve",
+    "proxmox_host": "10.14.16.2",
+    "proxmox_user": "root@pam",
+    "proxmox_password": "",
+    "control_plane_template_id": 9000,
+    "worker_template_id": 9000,
+    "vm_id_range": [
+        121,
+        129
+    ],
+    "vm_network_name": "vmbr56",
+    "vm_ssh_keys": "",
+    "preserved_ips": [
+        "192.168.56.1",
+        "192.168.56.5",
+        "192.168.56.7"
+    ],
+    "control_plane_vm_ids": [121],
+    "cni_manifest_file": "./examples/kube-flannel.yaml",
+    "pod_cidr": "10.244.0.0/16",
+    "svc_cidr": "10.233.0.0/16"
+}

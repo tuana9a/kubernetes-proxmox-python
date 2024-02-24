@@ -51,6 +51,3 @@ class TestProxmoxUtil(unittest.TestCase):
             util.ProxmoxUtil.extract_ip(
                 "ip=192.168.56.123/24,gw=192.168.56.1"), "192.168.56.123")
 
-
-if __name__ == '__main__':
-    unittest.main()
