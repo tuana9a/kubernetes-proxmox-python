@@ -48,6 +48,10 @@ OPTIONAL: for my personal use with https://github.com/kubernetes-sigs/nfs-subdir
 virt-customize -a $IMAGE_FILE --install nfs-common
 ```
 
+```bash
+virt-customize -a $IMAGE_FILE --install haproxy
+```
+
 Create the vm template
 
 ```bash
@@ -62,6 +66,7 @@ qm set $TEMPLATE_VM_ID --scsi0 $STORAGE:0,import-from=$PWD/$IMAGE_FILE
 qm set $TEMPLATE_VM_ID --ide2 $STORAGE:cloudinit
 qm set $TEMPLATE_VM_ID --boot order=scsi0
 qm set $TEMPLATE_VM_ID --serial0 socket --vga serial0
+qm set $TEMPLATE_VM_ID --name kube-1.27
 qm template $TEMPLATE_VM_ID
 ```
 
