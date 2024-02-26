@@ -12,20 +12,13 @@ from app.controller import NodeController
 urllib3.disable_warnings()
 log = Logger.DEBUG
 
-config_path = os.getenv("CONFIG_PATH")
-log.debug("config_path", config_path)
 target_vm_id = os.getenv("VMID")
 log.debug("target_vm_id", target_vm_id)
 
 if not target_vm_id:
     raise ValueError("env: VMID is missing")
-if not config_path:
-    raise ValueError("env: CONFIG_PATH is missing")
-if not os.path.exists(config_path):
-    raise FileNotFoundError(config_path)
 
-log.debug("config_path", config_path)
-cfg = load_config(config_path)
+cfg = load_config(log=log)
 proxmox_host = cfg["proxmox_host"]
 proxmox_user = cfg["proxmox_user"]
 proxmox_password = cfg["proxmox_password"]

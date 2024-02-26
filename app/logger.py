@@ -10,9 +10,7 @@ def now():
 
 
 def to_string(msg):
-    out = ""
-    for i in msg:
-        out = out + " " + str(i)
+    out = " ".join(list(map(lambda x: str(x), msg)))
     return out
 
 

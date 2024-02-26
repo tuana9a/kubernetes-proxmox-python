@@ -14,15 +14,7 @@ from app.controller import NodeController
 urllib3.disable_warnings()
 log = Logger.DEBUG
 
-config_path = os.getenv("CONFIG_PATH")
-
-if not config_path:
-    raise ValueError("env: CONFIG_PATH is missing")
-if not os.path.exists(config_path):
-    raise FileNotFoundError(config_path)
-
-log.debug("config_path", config_path)
-cfg = load_config(config_path)
+cfg = load_config(log=log)
 proxmox_host = cfg["proxmox_host"]
 proxmox_user = cfg["proxmox_user"]
 proxmox_password = cfg["proxmox_password"]
@@ -38,6 +30,7 @@ vm_password = cfg.get("vm_password", "1")
 vm_ssh_keys = cfg.get("vm_ssh_keys", None)
 apiserver_advertise_address = cfg.get("apiserver_advertise_address", None)
 cni_manifest_file = cfg.get("cni_manifest_file", None)
+control_plane_vm_ids = cfg.get("control_plane_vm_ids", None)
 
 nodectl = NodeController(
     ProxmoxAPI(

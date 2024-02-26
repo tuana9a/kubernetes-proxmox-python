@@ -86,8 +86,10 @@ class VmController:
             if exited: break
         log.debug(node, vm_id, "exec", pid, "duration", duration)
         log.debug(node, vm_id, "exec", pid, "exitcode", exitcode)
-        log.debug(node, vm_id, "exec", pid, "stdout", "\n", stdout)
-        log.debug(node, vm_id, "exec", pid, "stderr", "\n", stderr)
+        if stdout:
+            log.debug(node, vm_id, "exec", pid, "stdout\n" + str(stdout))
+        if stderr:
+            log.debug(node, vm_id, "exec", pid, "stderr\n" + str(stderr))
         return exitcode, stdout, stderr
 
     def wait_for_guest_agent(self, timeout=5 * 60, interval_check=15):
