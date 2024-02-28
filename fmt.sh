@@ -1,3 +1,3 @@
 #!/bin/bash
 
-.venv/bin/yapf -ir *.py app/
+.venv/bin/yapf -ir *.py examples/*.py app/

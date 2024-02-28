@@ -1,5 +1,6 @@
 import time
 
+from typing import List
 from proxmoxer import ProxmoxAPI
 from app.logger import Logger
 
@@ -23,16 +24,12 @@ class NodeController:
         log.debug(node, "clone", old_id, new_id)
         return r
 
-    def list_vm(self, start_id=0, stop_id=9999):
+    def list_vm(self):
         api = self.api
         node = self.node
         log = self.log
         r = api.nodes(node).qemu.get()
-        vm_list = []
-        for vm in r:
-            vm_id = vm["vmid"]
-            if (vm_id >= start_id and vm_id <= stop_id):
-                vm_list.append(vm)
+        vm_list = r
         log.debug(node, "list_vm", vm_list)
         return vm_list
 
@@ -57,7 +54,7 @@ class VmController:
         self.vm_id = vm_id
         self.log = log
 
-    def exec(self, cmd, timeout=5 * 60, interval_check=10):
+    def exec(self, cmd: List[str], timeout=30 * 60, interval_check=10):
         api = self.api
         node = self.node
         vm_id = self.vm_id
@@ -71,7 +68,7 @@ class VmController:
         stderr = None
         exitcode = None
         while True:
-            log.debug(node, vm_id, "exec", pid, "wait")
+            log.debug(node, vm_id, "exec", pid, "wait", duration)
             time.sleep(interval_check)
             duration += interval_check
             if duration > timeout:
@@ -92,7 +89,7 @@ class VmController:
             log.debug(node, vm_id, "exec", pid, "stderr\n" + str(stderr))
         return exitcode, stdout, stderr
 
-    def wait_for_guest_agent(self, timeout=5 * 60, interval_check=15):
+    def wait_for_guest_agent(self, timeout=10 * 60, interval_check=15):
         api = self.api
         node = self.node
         vm_id = self.vm_id
@@ -111,7 +108,7 @@ class VmController:
                 log.debug(node, vm_id, "wait_for_guest_agent", err)
         log.debug(node, vm_id, "wait_for_guest_agent", "READY")
 
-    def wait_for_shutdown(self, timeout=5 * 60, interval_check=15):
+    def wait_for_shutdown(self, timeout=10 * 60, interval_check=15):
         api = self.api
         node = self.node
         vm_id = self.vm_id
@@ -187,6 +184,15 @@ class VmController:
         log.debug(node, vm_id, "shutdown", r)
         return r
 
+    def reboot(self):
+        api = self.api
+        node = self.node
+        vm_id = self.vm_id
+        log = self.log
+        r = api.nodes(node).qemu(vm_id).status.reboot.post()
+        log.debug(node, vm_id, "reboot", r)
+        return r
+
     def write_file(self, filepath: str, content: str):
         api = self.api
         node = self.node
@@ -204,4 +210,13 @@ class VmController:
         log = self.log
         r = api.nodes(node).qemu(vm_id).delete()
         log.debug(node, vm_id, "delete", r)
+        return r
+
+    def read_file(self, filepath: str):
+        api = self.api
+        node = self.node
+        vm_id = self.vm_id
+        log = self.log
+        r = api.nodes(node).qemu(vm_id).agent("file-read").get(file=filepath)
+        log.debug(node, vm_id, "read_file", r)
         return r

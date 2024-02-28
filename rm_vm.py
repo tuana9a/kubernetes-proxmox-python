@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import time
 import urllib3
 
 from proxmoxer import ProxmoxAPI
@@ -35,4 +36,6 @@ nodectl = NodeController(
     log=log)
 
 vmctl = nodectl.vm(target_vm_id)
-vmctl.reboot()
+vmctl.shutdown()
+vmctl.wait_for_shutdown()
+vmctl.delete()
