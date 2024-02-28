@@ -22,12 +22,13 @@ proxmox_node = cfg["proxmox_node"]
 vm_network_name = cfg["vm_network_name"]
 preserved_ips = cfg.get("preserved_ips", [])
 vm_id_range = cfg.get("vm_id_range", [0, 9999])
-worker_template_id = cfg["worker_template_id"]
+lb_template_id = cfg["lb_template_id"]
 vm_name_prefix = cfg.get("vm_name_prefix", "i-")
 vm_username = cfg.get("vm_username", "u")
 vm_password = cfg.get("vm_password", "1")
 vm_ssh_keys = cfg.get("vm_ssh_keys", None)
-control_plane_vm_ids = cfg["control_plane_vm_ids"]
+haproxy_cfg = cfg.get("haproxy_cfg", None)
+haproxy_cfg_path = cfg.get("haproxy_cfg_path", "/etc/haproxy/haproxy.cfg")
 
 nodectl = NodeController(
     ProxmoxAPI(
@@ -38,6 +39,7 @@ nodectl = NodeController(
     ),
     proxmox_node,
     log=log)
+
 r = nodectl.describe_network(vm_network_name)
 network_interface = ipaddress.IPv4Interface(r["cidr"])
 vm_network_gw = str(network_interface.ip) or r["address"]
@@ -71,17 +73,17 @@ vm_id_new = util.find_missing_number(vm_id_range[0], vm_id_range[1],
 vm_name_new = f"{vm_name_prefix}{vm_id_new}"
 
 if not vm_id_new:
-    log.debug("Error: can't find new id")
+    log.error("Error: can't find new id")
     exit(1)
 log.debug("newid", vm_id_new)
 
 vm_ip_new = util.find_missing(vm_ip_pool, exist_vm_ip)
 if not vm_ip_new:
-    log.debug("Error: can't find new ip")
+    log.error("Error: can't find new ip")
     exit(1)
 log.debug("new_ip", vm_ip_new)
 
-nodectl.clone(worker_template_id, vm_id_new)
+nodectl.clone(lb_template_id, vm_id_new)
 
 vmctl = nodectl.vm(vm_id_new)
 
@@ -99,16 +101,12 @@ vmctl.resize_disk(disk="scsi0", size="+20G")
 vmctl.startup()
 vmctl.wait_for_guest_agent(timeout=5 * 60)
 
-join_cmd = None
-create_token_cmd = ["kubeadm", "token", "create", "--print-join-command"]
-for vm_id in control_plane_vm_ids:
-    exitcode, stdout, _ = nodectl.vm(vm_id).exec(create_token_cmd)
-    if exitcode == 0:
-        join_cmd = stdout.split()
-        break
+if not haproxy_cfg:
+    log.info("haproxy_cfg is not set, skipping copy haproxy config")
+    exit(0)
 
-if not join_cmd:
-    raise ValueError("can't get join_cmd")
+if not os.path.exists(haproxy_cfg):
+    raise FileNotFoundError(haproxy_cfg)
 
-log.debug("join_cmd", " ".join(join_cmd))
-vmctl.exec(join_cmd)
+with open(haproxy_cfg, "r", encoding="utf8") as f:
+    vmctl.write_file(haproxy_cfg_path, f.read())

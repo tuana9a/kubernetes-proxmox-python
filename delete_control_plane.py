@@ -10,27 +10,22 @@ from app.config import load_config
 from app.controller import NodeController
 
 urllib3.disable_warnings()
-log = Logger.DEBUG
+log = Logger.from_env()
 
-config_path = os.getenv("CONFIG_PATH")
-log.debug("config_path", config_path)
 target_vm_id = os.getenv("VMID")
 log.debug("target_vm_id", target_vm_id)
 
 if not target_vm_id:
     raise ValueError("env: VMID is missing")
-if not config_path:
-    raise ValueError("env: CONFIG_PATH is missing")
-if not os.path.exists(config_path):
-    raise FileNotFoundError(config_path)
 
-log.debug("config_path", config_path)
-cfg = load_config(config_path)
+cfg = load_config(log=log)
 proxmox_host = cfg["proxmox_host"]
 proxmox_user = cfg["proxmox_user"]
 proxmox_password = cfg["proxmox_password"]
 proxmox_node = cfg["proxmox_node"]
 vm_id_range = cfg.get("vm_id_range", [0, 9999])
+load_balancer_vm_id = cfg.get("load_balancer_vm_id", None)
+control_plane_vm_ids = cfg.get("control_plane_vm_ids", [])
 
 nodectl = NodeController(
     ProxmoxAPI(
@@ -42,7 +37,7 @@ nodectl = NodeController(
     proxmox_node,
     log=log)
 
-vm_list = nodectl.list_vm(vm_id_range[0], vm_id_range[1])
+vm_list = nodectl.list_vm()
 
 target_vm = None
 log.debug("len(vm_list)", len(vm_list))
@@ -59,6 +54,44 @@ if not target_vm:
 log.debug("vm", target_vm)
 
 vmctl = nodectl.vm(target_vm_id)
+# kubeadm reset is needed when deploying stacked control plane
+# https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-reset/#reset-workflow
+# Remove the control plane with etcd will avoid this error
+# https://serverfault.com/questions/1029654/deleting-a-control-node-from-the-cluster-kills-the-apiserver
+reset_cmd = ["kubeadm", "reset", "-f"]
+
+vmctl.exec(reset_cmd)
+
+if load_balancer_vm_id:
+    target_vm_name = target_vm["name"]
+    kubeconfig_filepath = "/etc/kubernetes/admin.conf"
+    if len(control_plane_vm_ids):
+        delete_node_cmd = [
+            "kubectl", f"--kubeconfig={kubeconfig_filepath}", "delete", "node",
+            target_vm_name
+        ]
+        log.debug("delete_node_cmd", delete_node_cmd)
+        for vm_id in control_plane_vm_ids:
+            exitcode, _, _ = nodectl.vm(vm_id).exec(delete_node_cmd,
+                                                    interval_check=3)
+            if exitcode == 0:
+                break
+
+    lbctl = nodectl.vm(load_balancer_vm_id)
+    delete_control_plane_haproxy_cmd = [
+        "/usr/local/bin/delete_control_plane_haproxy_cfg.py", "-c",
+        "/etc/haproxy/haproxy.cfg", "-n", target_vm_id
+    ]
+    log.debug("delete_control_plane_haproxy_cmd",
+              delete_control_plane_haproxy_cmd)
+    exitcode, stdout, stderr = lbctl.exec(delete_control_plane_haproxy_cmd,
+                                          interval_check=3)
+    if exitcode != 0:
+        raise Exception(
+            "some thing wrong with delete_control_plane_haproxy_cmd\n" +
+            str(stderr))
+    lbctl.exec(["systemctl", "reload", "haproxy"], interval_check=3)
+
 vmctl.shutdown()
 vmctl.wait_for_shutdown()
 vmctl.delete()
