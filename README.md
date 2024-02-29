@@ -78,8 +78,8 @@ IMAGE_FILE=bionic-server-cloudimg-amd64.img
 wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img -O $PWD/$IMAGE_FILE
 virt-customize -a $IMAGE_FILE --install qemu-guest-agent
 virt-customize -a $IMAGE_FILE --install haproxy
-virt-customize -a $IMAGE_FILE --copy-in $PWD/add_control_plane_haproxy_cfg.py:/usr/local/bin/
-virt-customize -a $IMAGE_FILE --copy-in $PWD/delete_control_plane_haproxy_cfg.py:/usr/local/bin/
+virt-customize -a $IMAGE_FILE --copy-in $PWD/add_backend_server_haproxy_cfg.py:/usr/local/bin/
+virt-customize -a $IMAGE_FILE --copy-in $PWD/delete_backend_server_haproxy_cfg.py:/usr/local/bin/
 ```
 
 Create the vm template
@@ -96,7 +96,7 @@ qm set $TEMPLATE_VM_ID --scsi0 $STORAGE:0,import-from=$PWD/$IMAGE_FILE
 qm set $TEMPLATE_VM_ID --ide2 $STORAGE:cloudinit
 qm set $TEMPLATE_VM_ID --boot order=scsi0
 qm set $TEMPLATE_VM_ID --serial0 socket --vga serial0
-qm set $TEMPLATE_VM_ID --name kube-load-balancer
+qm set $TEMPLATE_VM_ID --name haproxy
 qm template $TEMPLATE_VM_ID
 ```
 

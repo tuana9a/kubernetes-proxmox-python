@@ -110,12 +110,11 @@ vmctl.wait_for_guest_agent(timeout=5 * 60)
 
 if not is_multiple_control_planes:
     # standalone control plane
-    init_cmd = [
+    cmd = [
         "kubeadm", "init", f"--pod-network-cidr={pod_cidr}",
         f"--control-plane-endpoint={vm_ip_new}"
     ]
-    log.debug("init_cmd:", " ".join(init_cmd))
-    exitcode, stdout, _ = vmctl.exec(init_cmd, timeout=10 * 60)
+    exitcode, stdout, _ = vmctl.exec(cmd, timeout=10 * 60)
 
     if not cni_manifest_file:
         log.debug("skip ini cni step")
@@ -126,24 +125,24 @@ if not is_multiple_control_planes:
     with open(cni_manifest_file, "r", encoding="utf-8") as f:
         vmctl.write_file(cni_filepath, f.read())
 
-    apply_cni_cmd = [
+    cmd = [
         "kubectl", "apply", f"--kubeconfig={kubeconfig_filepath}", "-f",
         cni_filepath
     ]
-    vmctl.exec(apply_cni_cmd)
+    vmctl.exec(cmd)
     exit(0)
 
 # SECTION: multiple control plane
 
 lbctl = nodectl.vm(load_balancer_vm_id)
 
-add_control_plane_haproxy_cmd = [
-    "/usr/local/bin/add_control_plane_haproxy_cfg.py", "-c",
-    "/etc/haproxy/haproxy.cfg", "-n", vm_id_new, "-e", f"{vm_ip_new}:6443"
+cmd = [
+    "/usr/local/bin/add_backend_server_haproxy_cfg.py", "-c",
+    "/etc/haproxy/haproxy.cfg", "-n", vm_id_new, "-e", f"{vm_ip_new}:6443",
+    "--backend-name", "control-plane"
 ]
-log.debug("add_control_plane_haproxy_cmd", add_control_plane_haproxy_cmd)
-exitcode, stdout, stderr = lbctl.exec(add_control_plane_haproxy_cmd,
-                                      interval_check=3)
+
+exitcode, stdout, stderr = lbctl.exec(cmd, interval_check=3)
 if exitcode != 0:
     raise Exception("some thing wrong with add_control_plane_haproxy_cmd\n" +
                     str(stderr))
@@ -159,12 +158,11 @@ if not control_plane_vm_ids or not len(control_plane_vm_ids):
             raise Exception("can not detect the control_plane_endpoint")
         vm_ip = util.ProxmoxUtil.extract_ip(lb_ifconfig0)
         control_plane_endpoint = vm_ip
-    init_cmd = [
+    cmd = [
         "kubeadm", "init", f"--pod-network-cidr={pod_cidr}",
         f"--control-plane-endpoint={control_plane_endpoint}"
     ]
-    log.debug("init_cmd:", " ".join(init_cmd))
-    exitcode, stdout, _ = vmctl.exec(init_cmd, timeout=10 * 60)
+    exitcode, stdout, _ = vmctl.exec(cmd, timeout=10 * 60)
 
     if not cni_manifest_file:
         log.debug("skip ini cni step")
@@ -175,15 +173,12 @@ if not control_plane_vm_ids or not len(control_plane_vm_ids):
     with open(cni_manifest_file, "r", encoding="utf-8") as f:
         vmctl.write_file(cni_filepath, f.read())
 
-    apply_cni_cmd = [
+    cmd = [
         "kubectl", "apply", f"--kubeconfig={kubeconfig_filepath}", "-f",
         cni_filepath
     ]
-    vmctl.exec(apply_cni_cmd)
+    vmctl.exec(cmd)
     exit(0)
-
-# TODO: run kube admin init phase upload certs or trying to copy the cert manually?
-# avoid run the init phase to many times
 
 # https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/#manual-certs
 kube_certs = [
@@ -210,8 +205,7 @@ for vm_id in control_plane_vm_ids:
             # TODO: check truncated content https://pve.proxmox.com/pve-docs/api-viewer/index.html#/nodes/{node}/qemu/{vmid}/agent/file-read
             r = vmctl.write_file(kube_cert, content)
         is_copy_certs_success = True
-        # if the for loop can complete without error then should break it,
-        #   otherwise continue to the next control plane
+        # if it can complete without error then should break it, otherwise continue to the next control plane
         break
     except Exception as err:
         log.error(err)
@@ -220,9 +214,9 @@ if not is_copy_certs_success:
     raise Exception("can not copy kube certs")
 
 join_cmd = None
-create_token_cmd = ["kubeadm", "token", "create", "--print-join-command"]
+cmd = ["kubeadm", "token", "create", "--print-join-command"]
 for vm_id in control_plane_vm_ids:
-    exitcode, stdout, _ = nodectl.vm(vm_id).exec(create_token_cmd)
+    exitcode, stdout, _ = nodectl.vm(vm_id).exec(cmd)
     if exitcode == 0:
         join_cmd = stdout.split()
         break

@@ -29,8 +29,7 @@ nodectl = NodeController(
     log=log)
 
 kubeconfig_filepath = "/etc/kubernetes/admin.conf"
-cat_kubeconfig_cmd = ["cat", kubeconfig_filepath]
+cmd = ["cat", kubeconfig_filepath]
 for vm_id in control_plane_vm_ids:
-    exitcode, stdout, _ = nodectl.vm(vm_id).exec(cat_kubeconfig_cmd,
-                                                 interval_check=3)
+    exitcode, stdout, _ = nodectl.vm(vm_id).exec(cmd, interval_check=3)
     print(stdout)

@@ -58,38 +58,35 @@ vmctl = nodectl.vm(target_vm_id)
 # https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-reset/#reset-workflow
 # Remove the control plane with etcd will avoid this error
 # https://serverfault.com/questions/1029654/deleting-a-control-node-from-the-cluster-kills-the-apiserver
-reset_cmd = ["kubeadm", "reset", "-f"]
+cmd = ["kubeadm", "reset", "-f"]
 
-vmctl.exec(reset_cmd)
+try:
+    vmctl.exec(cmd)
+except Exception as err:
+    log.error(err)
 
 if load_balancer_vm_id:
     target_vm_name = target_vm["name"]
     kubeconfig_filepath = "/etc/kubernetes/admin.conf"
     if len(control_plane_vm_ids):
-        delete_node_cmd = [
+        cmd = [
             "kubectl", f"--kubeconfig={kubeconfig_filepath}", "delete", "node",
             target_vm_name
         ]
-        log.debug("delete_node_cmd", delete_node_cmd)
         for vm_id in control_plane_vm_ids:
-            exitcode, _, _ = nodectl.vm(vm_id).exec(delete_node_cmd,
-                                                    interval_check=3)
+            exitcode, _, _ = nodectl.vm(vm_id).exec(cmd, interval_check=3)
             if exitcode == 0:
                 break
 
     lbctl = nodectl.vm(load_balancer_vm_id)
-    delete_control_plane_haproxy_cmd = [
-        "/usr/local/bin/delete_control_plane_haproxy_cfg.py", "-c",
-        "/etc/haproxy/haproxy.cfg", "-n", target_vm_id
+    cmd = [
+        "/usr/local/bin/delete_backend_server_haproxy_cfg.py", "-c",
+        "/etc/haproxy/haproxy.cfg", "-n", target_vm_id, "--backend-name",
+        "control-plane"
     ]
-    log.debug("delete_control_plane_haproxy_cmd",
-              delete_control_plane_haproxy_cmd)
-    exitcode, stdout, stderr = lbctl.exec(delete_control_plane_haproxy_cmd,
-                                          interval_check=3)
+    exitcode, stdout, stderr = lbctl.exec(cmd, interval_check=3)
     if exitcode != 0:
-        raise Exception(
-            "some thing wrong with delete_control_plane_haproxy_cmd\n" +
-            str(stderr))
+        log.error(str(stderr))
     lbctl.exec(["systemctl", "reload", "haproxy"], interval_check=3)
 
 vmctl.shutdown()

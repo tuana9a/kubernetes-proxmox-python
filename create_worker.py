@@ -100,9 +100,9 @@ vmctl.startup()
 vmctl.wait_for_guest_agent(timeout=5 * 60)
 
 join_cmd = None
-create_token_cmd = ["kubeadm", "token", "create", "--print-join-command"]
+cmd = ["kubeadm", "token", "create", "--print-join-command"]
 for vm_id in control_plane_vm_ids:
-    exitcode, stdout, _ = nodectl.vm(vm_id).exec(create_token_cmd)
+    exitcode, stdout, _ = nodectl.vm(vm_id).exec(cmd)
     if exitcode == 0:
         join_cmd = stdout.split()
         break

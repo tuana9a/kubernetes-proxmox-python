@@ -59,18 +59,18 @@ for vm_id in control_plane_vm_ids:
     try:
         vmctl = nodectl.vm(vm_id)
         # drain the node before remove it
-        drain_cmd = [
+        cmd = [
             "kubectl", f"--kubeconfig={kubeconfig_filepath}", "drain",
             "--ignore-daemonsets", target_vm_name
         ]
         if drain_first:
-            vmctl.exec(drain_cmd, interval_check=5,
+            vmctl.exec(cmd, interval_check=5,
                        timeout=30 * 60)  # 30 mins should be enough
-        delete_node_cmd = [
+        cmd = [
             "kubectl", f"--kubeconfig={kubeconfig_filepath}", "delete", "node",
             target_vm_name
         ]
-        exitcode, _, _ = vmctl.exec(delete_node_cmd, interval_check=3)
+        exitcode, _, _ = vmctl.exec(cmd, interval_check=3)
         if exitcode == 0:
             break
     except Exception as err:
