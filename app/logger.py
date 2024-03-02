@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import os
 
 from datetime import datetime
-from typing_extensions import Self
 
 
 def now():
@@ -16,10 +17,10 @@ def to_string(msg):
 
 
 class Logger:
-    ERROR: Self
-    WARN: Self
-    INFO: Self
-    DEBUG: Self
+    ERROR: Logger
+    WARN: Logger
+    INFO: Logger
+    DEBUG: Logger
 
     @staticmethod
     def from_env():

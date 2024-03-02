@@ -107,3 +107,7 @@ See [./examples/config.json](./examples/config.json)
 # How to use
 
 TODO
+
+```bash
+sudo ln -sf $cwd/.venv/bin/kp /usr/local/bin/kp
+```

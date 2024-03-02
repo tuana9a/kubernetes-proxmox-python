@@ -5,43 +5,6 @@ from proxmoxer import ProxmoxAPI
 from app.logger import Logger
 
 
-class NodeController:
-
-    def __init__(self, api: ProxmoxAPI, node: str, log=Logger.DEBUG) -> None:
-        self.api = api
-        self.node = node
-        self.log = log
-        pass
-
-    def vm(self, vm_id):
-        return VmController(self.api, self.node, vm_id, log=self.log)
-
-    def clone(self, old_id, new_id):
-        api = self.api
-        node = self.node
-        log = self.log
-        r = api.nodes(node).qemu(old_id).clone.post(newid=new_id)
-        log.debug(node, "clone", old_id, new_id)
-        return r
-
-    def list_vm(self):
-        api = self.api
-        node = self.node
-        log = self.log
-        r = api.nodes(node).qemu.get()
-        vm_list = r
-        log.debug(node, "list_vm", vm_list)
-        return vm_list
-
-    def describe_network(self, network: str):
-        api = self.api
-        node = self.node
-        log = self.log
-        r = api.nodes(node).network(network).get()
-        log.debug(node, "describe_network", r)
-        return r
-
-
 class VmController:
 
     def __init__(self,
