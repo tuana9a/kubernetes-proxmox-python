@@ -46,3 +46,5 @@ class CatKubeConfigCmd(Cmd):
         for vm_id in control_plane_vm_ids:
             exitcode, stdout, _ = nodectl.vm(vm_id).exec(cmd, interval_check=3)
             print(stdout)
+            if (exitcode == 0):
+                return

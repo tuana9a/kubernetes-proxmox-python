@@ -30,4 +30,4 @@ class CreateLbCmd(Cmd):
                                  log=log)
 
         lbctl = LbController(nodectl, log=log)
-        lbctl.create_load_balancer(**cfg)
+        lbctl.create_lb(**cfg)

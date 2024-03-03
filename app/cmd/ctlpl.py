@@ -44,18 +44,18 @@ class DeleteControlPlaneCmd(Cmd):
         super().__init__("delete", aliases=["remove", "rm"])
 
     def _setup(self):
-        self.parser.add_argument("-i", "--vm-id", type=int, required=False)
+        self.parser.add_argument("vmid", type=int)
 
     def _run(self):
         urllib3.disable_warnings()
         log = Logger.from_env()
         cfg = load_config(log=log)
         args = self.parsed_args
-        target_vm_id = args.vm_id or os.getenv("VMID")
-        log.debug("target_vm_id", target_vm_id)
+        vm_id = args.vmid or os.getenv("VMID")
+        log.debug("vm_id", vm_id)
 
-        if not target_vm_id:
-            raise ValueError("env: VMID is missing")
+        if not vm_id:
+            raise ValueError("vm_id is missing")
 
         proxmox_node = cfg["proxmox_node"]
 
@@ -63,4 +63,4 @@ class DeleteControlPlaneCmd(Cmd):
                                  proxmox_node,
                                  log=log)
         clusterctl = ControlPlaneController(nodectl, log=log)
-        clusterctl.delete_control_plane(target_vm_id, **cfg)
+        clusterctl.delete_control_plane(vm_id, **cfg)

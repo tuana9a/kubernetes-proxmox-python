@@ -44,17 +44,17 @@ class DeleteWorkerCmd(Cmd):
         super().__init__("delete", aliases=["remove", "rm"])
 
     def _setup(self):
-        self.parser.add_argument("-i", "--vm-id", type=int, required=False)
+        self.parser.add_argument("vmid", type=int)
 
     def _run(self):
         urllib3.disable_warnings()
         log = Logger.from_env()
         args = self.parsed_args
-        target_vm_id = args.vm_id or os.getenv("VMID")
-        log.debug("target_vm_id", target_vm_id)
+        vm_id = args.vmid or os.getenv("VMID")
+        log.debug("vm_id", vm_id)
 
-        if not target_vm_id:
-            raise ValueError("env: VMID is missing")
+        if not vm_id:
+            raise ValueError("vm_id is missing")
 
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
@@ -63,4 +63,4 @@ class DeleteWorkerCmd(Cmd):
                                  log=log)
 
         workerctl = WorkerController(nodectl, log=log)
-        workerctl.delete_worker(target_vm_id, **cfg)
+        workerctl.delete_worker(vm_id, **cfg)
