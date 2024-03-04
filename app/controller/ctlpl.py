@@ -14,6 +14,31 @@ class ControlPlaneController:
         self.log = log
         pass
 
+    def copy_kube_certs(self,
+                        source_id,
+                        dest_id,
+                        certs=[
+                            "/etc/kubernetes/pki/ca.crt",
+                            "/etc/kubernetes/pki/ca.key",
+                            "/etc/kubernetes/pki/sa.key",
+                            "/etc/kubernetes/pki/sa.pub",
+                            "/etc/kubernetes/pki/front-proxy-ca.crt",
+                            "/etc/kubernetes/pki/front-proxy-ca.key",
+                            "/etc/kubernetes/pki/etcd/ca.crt",
+                            "/etc/kubernetes/pki/etcd/ca.key",
+                        ]):
+        # https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/#manual-certs
+        nodectl = self.nodectl
+        log = self.log
+        sourcectl = nodectl.vm(source_id)
+        destctl = nodectl.vm(dest_id)
+
+        for cert in certs:
+            r = sourcectl.read_file(cert)
+            content = r["content"]
+            # TODO: check truncated content https://pve.proxmox.com/pve-docs/api-viewer/index.html#/nodes/{node}/qemu/{vmid}/agent/file-read
+            r = destctl.write_file(cert, content)
+
     def create_control_plane(self,
                              vm_network_name,
                              control_plane_template_id,
@@ -67,8 +92,8 @@ class ControlPlaneController:
         vmctl.startup()
         vmctl.wait_for_guest_agent(timeout=5 * 60)
 
+        # SECTION: standalone control plane
         if not is_multiple_control_planes:
-            # standalone control plane
             cmd = [
                 "kubeadm", "init", f"--pod-network-cidr={pod_cidr}",
                 f"--control-plane-endpoint={new_vm_ip}"
@@ -76,8 +101,8 @@ class ControlPlaneController:
             exitcode, stdout, _ = vmctl.exec(cmd, timeout=10 * 60)
 
             if not cni_manifest_file:
-                log.debug("skip ini cni step")
-                exit(0)
+                log.debug("skip apply cni step")
+                return new_vm_id
 
             cni_filepath = "/root/cni.yaml"
             kubeconfig_filepath = "/etc/kubernetes/admin.conf"
@@ -89,10 +114,9 @@ class ControlPlaneController:
                 "-f", cni_filepath
             ]
             vmctl.exec(cmd)
-            exit(0)
+            return new_vm_id
 
-        # SECTION: multiple control plane
-
+        # SECTION: stacked control plane
         lbctl = nodectl.vm(load_balancer_vm_id)
         cmd = [
             "/usr/local/bin/add_backend_server_haproxy_cfg.py", "-c",
@@ -107,8 +131,8 @@ class ControlPlaneController:
                 str(stderr))
         lbctl.exec(["systemctl", "reload", "haproxy"], interval_check=3)
 
+        # No previous control plane, init a new one
         if not control_plane_vm_ids or not len(control_plane_vm_ids):
-            # no previous control plane, init a new one
             control_plane_endpoint = apiserver_endpoint
             if not control_plane_endpoint:
                 lb_config = lbctl.current_config()
@@ -126,7 +150,7 @@ class ControlPlaneController:
 
             if not cni_manifest_file:
                 log.debug("skip ini cni step")
-                exit(0)
+                return new_vm_id
 
             cni_filepath = "/root/cni.yaml"
             kubeconfig_filepath = "/etc/kubernetes/admin.conf"
@@ -138,33 +162,18 @@ class ControlPlaneController:
                 "-f", cni_filepath
             ]
             vmctl.exec(cmd)
-            exit(0)
+            return new_vm_id
 
-        # https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/#manual-certs
-        certs = [
-            "/etc/kubernetes/pki/ca.crt",
-            "/etc/kubernetes/pki/ca.key",
-            "/etc/kubernetes/pki/sa.key",
-            "/etc/kubernetes/pki/sa.pub",
-            "/etc/kubernetes/pki/front-proxy-ca.crt",
-            "/etc/kubernetes/pki/front-proxy-ca.key",
-            "/etc/kubernetes/pki/etcd/ca.crt",
-            "/etc/kubernetes/pki/etcd/ca.key",
-        ]
+        # There are previous control plane prepare new control plane
+        is_copy_certs_success = False
 
-        # make sure the folder is exists
+        # Ensure folders
         vmctl.exec(["mkdir", "-p", "/etc/kubernetes/pki/etcd"],
                    interval_check=3)
 
-        is_copy_certs_success = False
         for id in control_plane_vm_ids:
             try:
-                ctlplctl = nodectl.vm(id)
-                for cert in certs:
-                    r = ctlplctl.read_file(cert)
-                    content = r["content"]
-                    # TODO: check truncated content https://pve.proxmox.com/pve-docs/api-viewer/index.html#/nodes/{node}/qemu/{vmid}/agent/file-read
-                    r = vmctl.write_file(cert, content)
+                self.copy_kube_certs(id, new_vm_id)
                 is_copy_certs_success = True
                 # if it can complete without error then should break it, otherwise continue to the next control plane
                 break
