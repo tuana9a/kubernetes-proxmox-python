@@ -55,7 +55,8 @@ class WorkerService:
         wkctl.resize_disk(disk="scsi0", size="+20G")
         wkctl.startup()
         wkctl.wait_for_guest_agent()
-        join_cmd = nodectl.ctlplvmctl(control_plane_vm_id).create_join_cmd()
+        join_cmd = nodectl.ctlplvmctl(
+            control_plane_vm_id).kubeadm().create_join_command()
         wkctl.exec(join_cmd)
         return new_vm_id
 

@@ -4,8 +4,7 @@ from typing import List
 from proxmoxer import ProxmoxAPI
 from app.logger import Logger
 from app.error import *
-
-TIMEOUT = 30 * 60  # 30 min
+from app import config
 
 
 class VmController:
@@ -20,7 +19,7 @@ class VmController:
         self.vm_id = vm_id
         self.log = log
 
-    def exec(self, cmd: List[str], timeout=TIMEOUT, interval_check=10):
+    def exec(self, cmd: List[str], timeout=config.TIMEOUT, interval_check=10):
         api = self.api
         node = self.node
         vm_id = self.vm_id
@@ -55,7 +54,7 @@ class VmController:
             log.debug(node, vm_id, "exec", pid, "stderr\n" + str(stderr))
         return exitcode, stdout, stderr
 
-    def wait_for_guest_agent(self, timeout=TIMEOUT, interval_check=15):
+    def wait_for_guest_agent(self, timeout=config.TIMEOUT, interval_check=15):
         api = self.api
         node = self.node
         vm_id = self.vm_id
@@ -74,7 +73,7 @@ class VmController:
                 log.debug(node, vm_id, "wait_for_guest_agent", duration)
         log.debug(node, vm_id, "wait_for_guest_agent", "READY")
 
-    def wait_for_shutdown(self, timeout=TIMEOUT, interval_check=15):
+    def wait_for_shutdown(self, timeout=config.TIMEOUT, interval_check=15):
         api = self.api
         node = self.node
         vm_id = self.vm_id
@@ -188,6 +187,45 @@ class VmController:
         return r
 
 
+class _KubeadmExecutor():
+
+    def __init__(self, vmctl: VmController) -> None:
+        self.vmctl = vmctl
+
+    def reset(self, cmd=["kubeadm", "reset", "-f"]):
+        vmctl = self.vmctl
+        return vmctl.exec(cmd)
+
+    def init(self, control_plane_endpoint, pod_cidr, timeout=10 * 60):
+        vmctl = self.vmctl
+        cmd = [
+            "kubeadm",
+            "init",
+            f"--control-plane-endpoint={control_plane_endpoint}"
+            f"--pod-network-cidr={pod_cidr}",
+        ]
+        return vmctl.exec(cmd, timeout=timeout)
+
+    def create_join_command(
+            self,
+            cmd=["kubeadm", "token", "create", "--print-join-command"],
+            is_control_plane=False,
+            timeout=config.TIMEOUT,
+            interval_check=3):
+        vmctl = self.vmctl
+        log = vmctl.log
+        exitcode, stdout, stderr = vmctl.exec(cmd,
+                                              timeout=timeout,
+                                              interval_check=interval_check)
+        if exitcode != 0:
+            raise FailedToCreateJoinCmd(stderr)
+        join_cmd: List[str] = stdout.split()
+        if is_control_plane:
+            join_cmd.append("--control-plane")
+        log.debug("join_cmd", join_cmd)
+        return join_cmd
+
+
 class KubeVmController(VmController):
 
     def __init__(self,
@@ -196,9 +234,10 @@ class KubeVmController(VmController):
                  vm_id: str,
                  log=Logger.DEBUG) -> None:
         super().__init__(api, node, vm_id, log)
+        self._kubeadm = _KubeadmExecutor(self)
 
-    def reset_kubeadm(self, cmd=["kubeadm", "reset", "-f"]):
-        return self.exec(cmd)
+    def kubeadm(self):
+        return self._kubeadm
 
 
 class ControlPlaneVmController(KubeVmController):
@@ -210,37 +249,9 @@ class ControlPlaneVmController(KubeVmController):
                  log=Logger.DEBUG) -> None:
         super().__init__(api, node, vm_id, log)
 
-    def create_join_cmd(
-            self,
-            cmd=["kubeadm", "token", "create", "--print-join-command"],
-            timeout=TIMEOUT,
-            interval_check=3):
-        log = self.log
-        exitcode, stdout, stderr = self.exec(cmd,
-                                             timeout=timeout,
-                                             interval_check=interval_check)
-        if exitcode != 0:
-            raise FailedToCreateJoinCmd(stderr)
-        join_cmd: List[str] = stdout.split()
-        log.debug("join_cmd", join_cmd)
-        return join_cmd
-
-    def create_ctlpl_join_cmd(
-            self,
-            cmd=["kubeadm", "token", "create", "--print-join-command"],
-            timeout=TIMEOUT,
-            interval_check=3):
-        log = self.log
-        join_cmd = self.create_join_cmd(cmd,
-                                        timeout=timeout,
-                                        interval_check=interval_check)
-        join_cmd.append("--control-plane")
-        log.debug("join_cmd", join_cmd)
-        return join_cmd
-
     def drain_node(self,
                    node_name: str,
-                   kubeconfig_filepath="/etc/kubernetes/admin.conf"):
+                   kubeconfig_filepath=config.KUBECONFIG):
         cmd = [
             "kubectl", f"--kubeconfig={kubeconfig_filepath}", "drain",
             "--ignore-daemonsets", node_name
@@ -248,9 +259,7 @@ class ControlPlaneVmController(KubeVmController):
         # 30 mins should be enough
         return self.exec(cmd, interval_check=5, timeout=30 * 60)
 
-    def delete_node(self,
-                    node_name,
-                    kubeconfig_filepath="/etc/kubernetes/admin.conf"):
+    def delete_node(self, node_name, kubeconfig_filepath=config.KUBECONFIG):
         cmd = [
             "kubectl", f"--kubeconfig={kubeconfig_filepath}", "delete", "node",
             node_name
@@ -261,8 +270,15 @@ class ControlPlaneVmController(KubeVmController):
         for d in dirs:
             self.exec(["mkdir", "-p", d], interval_check=3)
 
-    def cat_kubeconfig(self, filepath="/etc/kubernetes/admin.conf"):
+    def cat_kubeconfig(self, filepath=config.KUBECONFIG):
         cmd = ["cat", filepath]
+        return self.exec(cmd)
+
+    def apply_file(self, filepath: str, kubeconfig_filepath=config.KUBECONFIG):
+        cmd = [
+            "kubectl", "apply", f"--kubeconfig={kubeconfig_filepath}", "-f",
+            filepath
+        ]
         return self.exec(cmd)
 
 

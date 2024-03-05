@@ -93,6 +93,7 @@ class JoinWorkerCmd(Cmd):
                                  proxmox_node,
                                  log=log)
 
-        join_cmd = nodectl.ctlplvmctl(control_plane_id).create_join_cmd()
+        join_cmd = nodectl.ctlplvmctl(
+            control_plane_id).kubeadm().create_join_command()
         for id in worker_ids:
             nodectl.wkctl(id).exec(join_cmd)

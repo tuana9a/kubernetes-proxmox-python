@@ -93,36 +93,26 @@ class ControlPlaneService:
 
         # SECTION: standalone control plane
         if not is_multiple_control_planes:
-            cmd = [
-                "kubeadm", "init", f"--pod-network-cidr={pod_cidr}",
-                f"--control-plane-endpoint={new_vm_ip}"
-            ]
-            exitcode, stdout, _ = ctlplvmctl.exec(cmd, timeout=10 * 60)
+            exitcode, _, _ = ctlplvmctl.kubeadm().init(
+                control_plane_endpoint=new_vm_id, pod_cidr=pod_cidr)
 
             if not cni_manifest_file:
                 log.debug("skip apply cni step")
                 return new_vm_id
 
             cni_filepath = "/root/cni.yaml"
-            kubeconfig_filepath = "/etc/kubernetes/admin.conf"
             with open(cni_manifest_file, "r", encoding="utf-8") as f:
                 ctlplvmctl.write_file(cni_filepath, f.read())
-
-            cmd = [
-                "kubectl", "apply", f"--kubeconfig={kubeconfig_filepath}",
-                "-f", cni_filepath
-            ]
-            ctlplvmctl.exec(cmd)
+                ctlplvmctl.apply_file(cni_filepath)
             return new_vm_id
 
         # SECTION: stacked control plane
         lbctl = nodectl.lbctl(load_balancer_vm_id)
-        exitcode, stdout, stderr = lbctl.add_backend("control-plane",
-                                                     new_vm_id,
-                                                     f"{new_vm_ip}:6443")
+        exitcode, _, stderr = lbctl.add_backend("control-plane", new_vm_id,
+                                                f"{new_vm_ip}:6443")
         if exitcode != 0:
-            raise Exception("some thing wrong with add_backend\n" +
-                            str(stderr))
+            log.error(stderr)
+            raise Exception("some thing wrong with add_backend")
         lbctl.reload_haproxy()
 
         # No previous control plane, init a new one
@@ -136,32 +126,26 @@ class ControlPlaneService:
                         "can not detect the control_plane_endpoint")
                 vm_ip = util.ProxmoxUtil.extract_ip(lb_ifconfig0)
                 control_plane_endpoint = vm_ip
-            cmd = [
-                "kubeadm", "init", f"--pod-network-cidr={pod_cidr}",
-                f"--control-plane-endpoint={control_plane_endpoint}"
-            ]
-            exitcode, stdout, _ = ctlplvmctl.exec(cmd, timeout=10 * 60)
+            exitcode, _, _ = ctlplvmctl.kubeadm().init(
+                control_plane_endpoint=control_plane_endpoint,
+                pod_cidr=pod_cidr)
 
             if not cni_manifest_file:
                 log.debug("skip ini cni step")
                 return new_vm_id
 
             cni_filepath = "/root/cni.yaml"
-            kubeconfig_filepath = "/etc/kubernetes/admin.conf"
             with open(cni_manifest_file, "r", encoding="utf-8") as f:
                 ctlplvmctl.write_file(cni_filepath, f.read())
-                cmd = [
-                    "kubectl", "apply", f"--kubeconfig={kubeconfig_filepath}",
-                    "-f", cni_filepath
-                ]
-                ctlplvmctl.exec(cmd)
+                ctlplvmctl.apply_file(cni_filepath)
             return new_vm_id
 
         # There are previous control plane prepare new control plane
         ctlplvmctl.ensure_cert_dirs()
         self.copy_kube_certs(control_plane_vm_id, new_vm_id)
         existed_ctlplvmctl = nodectl.ctlplvmctl(control_plane_vm_id)
-        join_cmd = existed_ctlplvmctl.create_ctlpl_join_cmd()
+        join_cmd = existed_ctlplvmctl.kubeadm().create_join_command(
+            is_control_plane=True)
         log.debug("join_cmd", " ".join(join_cmd))
         ctlplvmctl.exec(join_cmd, timeout=20 * 60)
         return new_vm_id
@@ -181,7 +165,7 @@ class ControlPlaneService:
         # Remove the control plane with etcd will avoid this error
         # https://serverfault.com/questions/1029654/deleting-a-control-node-from-the-cluster-kills-the-apiserver
         try:
-            ctlplvmctl.reset_kubeadm()
+            ctlplvmctl.kubeadm().reset()
         except Exception as err:
             log.error(err)
 

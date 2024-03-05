@@ -11,3 +11,7 @@ def load_config(config_path=os.getenv("CONFIG_PATH"), log=Logger.DEBUG):
         raise FileNotFoundError(config_path)
     with open(config_path, "r") as f:
         return json.loads(f.read())
+
+
+KUBECONFIG = "/etc/kubernetes/admin.conf"
+TIMEOUT = 30 * 60  # 30 min
