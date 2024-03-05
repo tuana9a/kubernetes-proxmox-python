@@ -19,22 +19,21 @@ class RebootVmCmd(Cmd):
         super().__init__("reboot")
 
     def _setup(self):
-        self.parser.add_argument("vmid", type=int)
+        self.parser.add_argument("ids", nargs="+")
 
     def _run(self):
         urllib3.disable_warnings()
         args = self.parsed_args
         log = Logger.from_env()
-        vm_id = args.vmid or os.getenv("VMID")
-        if not vm_id:
-            raise ValueError("vm_id is missing")
+        ids = args.ids
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
         nodectl = NodeController(NodeController.create_proxmox_client(**cfg),
                                  proxmox_node,
                                  log=log)
-        vmctl = nodectl.vmctl(vm_id)
-        vmctl.reboot()
+        for id in ids:
+            vmctl = nodectl.vmctl(id)
+            vmctl.reboot()
 
 
 class RemoveVmCmd(Cmd):
@@ -43,21 +42,20 @@ class RemoveVmCmd(Cmd):
         super().__init__("remove", aliases=["rm"])
 
     def _setup(self):
-        self.parser.add_argument("vmid", type=int)
+        self.parser.add_argument("ids", nargs="+")
 
     def _run(self):
         urllib3.disable_warnings()
         args = self.parsed_args
         log = Logger.from_env()
-        vm_id = args.vmid or os.getenv("VMID")
-        if not vm_id:
-            raise ValueError("vm_id is missing")
+        ids = args.ids
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
         nodectl = NodeController(NodeController.create_proxmox_client(**cfg),
                                  proxmox_node,
                                  log=log)
-        vmctl = nodectl.vmctl(vm_id)
-        vmctl.shutdown()
-        vmctl.wait_for_shutdown()
-        vmctl.delete()
+        for id in ids:
+            vmctl = nodectl.vmctl(id)
+            vmctl.shutdown()
+            vmctl.wait_for_shutdown()
+            vmctl.delete()

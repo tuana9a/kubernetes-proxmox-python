@@ -75,18 +75,15 @@ class JoinWorkerCmd(Cmd):
         super().__init__("join")
 
     def _setup(self):
-        self.parser.add_argument("-w", "--worker-ids", nargs="+", type=int)
-        self.parser.add_argument("-c",
-                                 "--control-plane-id",
-                                 type=int,
-                                 required=True)
+        self.parser.add_argument("ctlplid", type=int)
+        self.parser.add_argument("workerids", nargs="+")
 
     def _run(self):
         urllib3.disable_warnings()
         log = Logger.from_env()
         args = self.parsed_args
-        worker_ids = args.worker_ids
-        control_plane_id = args.control_plane_id
+        worker_ids = args.workerids
+        control_plane_id = args.ctlplid
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
         nodectl = NodeController(NodeController.create_proxmox_client(**cfg),
