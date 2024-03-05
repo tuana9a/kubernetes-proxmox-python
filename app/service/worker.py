@@ -7,7 +7,7 @@ from app.error import *
 from app import util
 
 
-class WorkerController:
+class WorkerService:
 
     def __init__(self, nodectl: NodeController, log=Logger.DEBUG) -> None:
         self.nodectl = nodectl
@@ -15,9 +15,9 @@ class WorkerController:
         pass
 
     def create_worker(self,
-                      vm_network_name,
-                      worker_template_id,
-                      control_plane_vm_ids,
+                      vm_network_name: str,
+                      worker_template_id: int,
+                      control_plane_vm_id: int,
                       preserved_ips=[],
                       vm_id_range=[0, 9999],
                       vm_name_prefix="i-",
@@ -42,8 +42,8 @@ class WorkerController:
         new_vm_name = f"{vm_name_prefix}{new_vm_id}"
         nodectl.clone(worker_template_id, new_vm_id)
 
-        vmctl = nodectl.vm(new_vm_id)
-        vmctl.update_config(
+        wkctl = nodectl.wkctl(new_vm_id)
+        wkctl.update_config(
             name=new_vm_name,
             ciuser=vm_username,
             cipassword=vm_password,
@@ -52,74 +52,33 @@ class WorkerController:
             net0=f"virtio,bridge={vm_network_name}",
             ipconfig0=f"ip={new_vm_ip}/24,gw={network_gw_ip}",
         )
-
-        vmctl.resize_disk(disk="scsi0", size="+20G")
-        vmctl.startup()
-        vmctl.wait_for_guest_agent(timeout=5 * 60)
-
-        join_cmd = None
-        cmd = ["kubeadm", "token", "create", "--print-join-command"]
-        for vm_id in control_plane_vm_ids:
-            exitcode, stdout, _ = nodectl.vm(vm_id).exec(cmd)
-            if exitcode == 0:
-                join_cmd = stdout.split()
-                break
-
-        if not join_cmd:
-            raise ValueError("can't get join_cmd")
-
-        log.debug("join_cmd", " ".join(join_cmd))
-        vmctl.exec(join_cmd)
+        wkctl.resize_disk(disk="scsi0", size="+20G")
+        wkctl.startup()
+        wkctl.wait_for_guest_agent()
+        join_cmd = nodectl.ctlplvmctl(control_plane_vm_id).create_join_cmd()
+        wkctl.exec(join_cmd)
         return new_vm_id
 
     def delete_worker(self,
                       vm_id,
-                      control_plane_vm_ids,
+                      control_plane_vm_id,
                       drain_first=True,
                       **kwargs):
         nodectl = self.nodectl
         log = self.log
-
-        vm_list = nodectl.list_vm()
-
-        vm = None
-        log.debug("len(vm_list)", len(vm_list))
-        for x in vm_list:
-            id = x["vmid"]
-            if str(id) == str(vm_id):
-                vm = x
-
-        if not vm:
-            log.error("vm", vm_id, "not found")
-            raise VmNotFoundError(vm_id)
-
-        log.debug("vm", vm)
-
+        vm = nodectl.find_vm(vm_id)
         vm_name = vm["name"]
-        kubeconfig_filepath = "/etc/kubernetes/admin.conf"
 
-        for id in control_plane_vm_ids:
+        if control_plane_vm_id:
+            ctlplctl = nodectl.ctlplvmctl(control_plane_vm_id)
             try:
-                vmctl = nodectl.vm(id)
-                # drain the node before remove it
-                cmd = [
-                    "kubectl", f"--kubeconfig={kubeconfig_filepath}", "drain",
-                    "--ignore-daemonsets", vm_name
-                ]
                 if drain_first:
-                    vmctl.exec(cmd, interval_check=5,
-                               timeout=30 * 60)  # 30 mins should be enough
-                cmd = [
-                    "kubectl", f"--kubeconfig={kubeconfig_filepath}", "delete",
-                    "node", vm_name
-                ]
-                exitcode, _, _ = vmctl.exec(cmd, interval_check=3)
-                if exitcode == 0:
-                    break
+                    ctlplctl.drain_node(vm_name)
+                ctlplctl.delete_node(vm_name)
             except Exception as err:
                 log.error(err)
 
-        vmctl = nodectl.vm(vm_id)
+        vmctl = nodectl.vmctl(vm_id)
         vmctl.shutdown()
         vmctl.wait_for_shutdown()
         vmctl.delete()

@@ -78,8 +78,7 @@ IMAGE_FILE=bionic-server-cloudimg-amd64.img
 wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.img -O $PWD/$IMAGE_FILE
 virt-customize -a $IMAGE_FILE --install qemu-guest-agent
 virt-customize -a $IMAGE_FILE --install haproxy
-virt-customize -a $IMAGE_FILE --copy-in $PWD/add_backend_server_haproxy_cfg.py:/usr/local/bin/
-virt-customize -a $IMAGE_FILE --copy-in $PWD/delete_backend_server_haproxy_cfg.py:/usr/local/bin/
+virt-customize -a $IMAGE_FILE --copy-in $PWD/config_haproxy.py:/usr/local/bin/
 ```
 
 Create the vm template
@@ -103,6 +102,18 @@ qm template $TEMPLATE_VM_ID
 # Prepare the config.json
 
 See [./examples/config.json](./examples/config.json)
+
+# Code structure
+
+```mermaid
+graph TD;
+  cmd-->service;
+  cmd-->controller;
+  service-->controller;
+  service-->util;
+  cmd-->util;
+  controller-->util;
+```
 
 # How to use
 

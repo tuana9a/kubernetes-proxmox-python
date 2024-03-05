@@ -7,7 +7,7 @@ from app import util
 from app.error import *
 
 
-class ControlPlaneController:
+class ControlPlaneService:
 
     def __init__(self, nodectl: NodeController, log=Logger.DEBUG) -> None:
         self.nodectl = nodectl
@@ -30,8 +30,8 @@ class ControlPlaneController:
         # https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/#manual-certs
         nodectl = self.nodectl
         log = self.log
-        sourcectl = nodectl.vm(source_id)
-        destctl = nodectl.vm(dest_id)
+        sourcectl = nodectl.vmctl(source_id)
+        destctl = nodectl.vmctl(dest_id)
 
         for cert in certs:
             r = sourcectl.read_file(cert)
@@ -51,7 +51,7 @@ class ControlPlaneController:
                              vm_ssh_keys=None,
                              apiserver_endpoint=None,
                              cni_manifest_file=None,
-                             control_plane_vm_ids=None,
+                             control_plane_vm_id=None,
                              load_balancer_vm_id=None,
                              **kwargs):
         nodectl = self.nodectl
@@ -77,8 +77,8 @@ class ControlPlaneController:
 
         nodectl.clone(control_plane_template_id, new_vm_id)
 
-        vmctl = nodectl.vm(new_vm_id)
-        vmctl.update_config(
+        ctlplvmctl = nodectl.ctlplvmctl(new_vm_id)
+        ctlplvmctl.update_config(
             name=new_vm_name,
             ciuser=vm_username,
             cipassword=vm_password,
@@ -87,10 +87,9 @@ class ControlPlaneController:
             ipconfig0=f"ip={new_vm_ip}/24,gw={network_gw_ip}",
             sshkeys=util.ProxmoxUtil.encode_sshkeys(vm_ssh_keys),
         )
-
-        vmctl.resize_disk(disk="scsi0", size="+20G")
-        vmctl.startup()
-        vmctl.wait_for_guest_agent(timeout=5 * 60)
+        ctlplvmctl.resize_disk(disk="scsi0", size="+20G")
+        ctlplvmctl.startup()
+        ctlplvmctl.wait_for_guest_agent()
 
         # SECTION: standalone control plane
         if not is_multiple_control_planes:
@@ -98,7 +97,7 @@ class ControlPlaneController:
                 "kubeadm", "init", f"--pod-network-cidr={pod_cidr}",
                 f"--control-plane-endpoint={new_vm_ip}"
             ]
-            exitcode, stdout, _ = vmctl.exec(cmd, timeout=10 * 60)
+            exitcode, stdout, _ = ctlplvmctl.exec(cmd, timeout=10 * 60)
 
             if not cni_manifest_file:
                 log.debug("skip apply cni step")
@@ -107,32 +106,27 @@ class ControlPlaneController:
             cni_filepath = "/root/cni.yaml"
             kubeconfig_filepath = "/etc/kubernetes/admin.conf"
             with open(cni_manifest_file, "r", encoding="utf-8") as f:
-                vmctl.write_file(cni_filepath, f.read())
+                ctlplvmctl.write_file(cni_filepath, f.read())
 
             cmd = [
                 "kubectl", "apply", f"--kubeconfig={kubeconfig_filepath}",
                 "-f", cni_filepath
             ]
-            vmctl.exec(cmd)
+            ctlplvmctl.exec(cmd)
             return new_vm_id
 
         # SECTION: stacked control plane
-        lbctl = nodectl.vm(load_balancer_vm_id)
-        cmd = [
-            "/usr/local/bin/add_backend_server_haproxy_cfg.py", "-c",
-            "/etc/haproxy/haproxy.cfg", "-n", new_vm_id, "-e",
-            f"{new_vm_ip}:6443", "--backend-name", "control-plane"
-        ]
-
-        exitcode, stdout, stderr = lbctl.exec(cmd, interval_check=3)
+        lbctl = nodectl.lbctl(load_balancer_vm_id)
+        exitcode, stdout, stderr = lbctl.add_backend("control-plane",
+                                                     new_vm_id,
+                                                     f"{new_vm_ip}:6443")
         if exitcode != 0:
-            raise Exception(
-                "some thing wrong with add_control_plane_haproxy_cmd\n" +
-                str(stderr))
-        lbctl.exec(["systemctl", "reload", "haproxy"], interval_check=3)
+            raise Exception("some thing wrong with add_backend\n" +
+                            str(stderr))
+        lbctl.reload_haproxy()
 
         # No previous control plane, init a new one
-        if not control_plane_vm_ids or not len(control_plane_vm_ids):
+        if not control_plane_vm_id:
             control_plane_endpoint = apiserver_endpoint
             if not control_plane_endpoint:
                 lb_config = lbctl.current_config()
@@ -146,7 +140,7 @@ class ControlPlaneController:
                 "kubeadm", "init", f"--pod-network-cidr={pod_cidr}",
                 f"--control-plane-endpoint={control_plane_endpoint}"
             ]
-            exitcode, stdout, _ = vmctl.exec(cmd, timeout=10 * 60)
+            exitcode, stdout, _ = ctlplvmctl.exec(cmd, timeout=10 * 60)
 
             if not cni_manifest_file:
                 log.debug("skip ini cni step")
@@ -155,111 +149,52 @@ class ControlPlaneController:
             cni_filepath = "/root/cni.yaml"
             kubeconfig_filepath = "/etc/kubernetes/admin.conf"
             with open(cni_manifest_file, "r", encoding="utf-8") as f:
-                vmctl.write_file(cni_filepath, f.read())
-
-            cmd = [
-                "kubectl", "apply", f"--kubeconfig={kubeconfig_filepath}",
-                "-f", cni_filepath
-            ]
-            vmctl.exec(cmd)
+                ctlplvmctl.write_file(cni_filepath, f.read())
+                cmd = [
+                    "kubectl", "apply", f"--kubeconfig={kubeconfig_filepath}",
+                    "-f", cni_filepath
+                ]
+                ctlplvmctl.exec(cmd)
             return new_vm_id
 
         # There are previous control plane prepare new control plane
-        is_copy_certs_success = False
-
-        # Ensure folders
-        vmctl.exec(["mkdir", "-p", "/etc/kubernetes/pki/etcd"],
-                   interval_check=3)
-
-        for id in control_plane_vm_ids:
-            try:
-                self.copy_kube_certs(id, new_vm_id)
-                is_copy_certs_success = True
-                # if it can complete without error then should break it, otherwise continue to the next control plane
-                break
-            except Exception as err:
-                log.error(err)
-
-        if not is_copy_certs_success:
-            raise Exception("can not copy kube certs")
-
-        join_cmd = None
-        cmd = ["kubeadm", "token", "create", "--print-join-command"]
-        for id in control_plane_vm_ids:
-            exitcode, stdout, _ = nodectl.vm(id).exec(cmd)
-            if exitcode == 0:
-                join_cmd = stdout.split()
-                break
-
-        if not join_cmd:
-            raise ValueError("can't get join_cmd")
-
-        join_cmd.append("--control-plane")
+        ctlplvmctl.ensure_cert_dirs()
+        self.copy_kube_certs(control_plane_vm_id, new_vm_id)
+        existed_ctlplvmctl = nodectl.ctlplvmctl(control_plane_vm_id)
+        join_cmd = existed_ctlplvmctl.create_ctlpl_join_cmd()
         log.debug("join_cmd", " ".join(join_cmd))
-        vmctl.exec(join_cmd, timeout=20 * 60)
+        ctlplvmctl.exec(join_cmd, timeout=20 * 60)
         return new_vm_id
 
     def delete_control_plane(self,
                              vm_id,
                              load_balancer_vm_id=None,
-                             control_plane_vm_ids=None,
+                             control_plane_vm_id=None,
                              **kwargs):
         nodectl = self.nodectl
         log = self.log
-
-        vm_list = nodectl.list_vm()
-
-        vm = None
-        log.debug("len(vm_list)", len(vm_list))
-        for x in vm_list:
-            id = x["vmid"]
-            if str(id) == str(vm_id):
-                vm = x
-                break
-
-        if not vm:
-            log.error("vmid", vm_id, "not found")
-            raise VmNotFoundError(vm_id)
-
-        log.debug("vm", vm)
-
-        vmctl = nodectl.vm(vm_id)
+        vm = nodectl.find_vm(vm_id)
+        vm_name = vm["name"]
+        ctlplvmctl = nodectl.ctlplvmctl(vm_id)
         # kubeadm reset is needed when deploying stacked control plane
         # https://kubernetes.io/docs/reference/setup-tools/kubeadm/kubeadm-reset/#reset-workflow
         # Remove the control plane with etcd will avoid this error
         # https://serverfault.com/questions/1029654/deleting-a-control-node-from-the-cluster-kills-the-apiserver
-        cmd = ["kubeadm", "reset", "-f"]
-
         try:
-            vmctl.exec(cmd)
+            ctlplvmctl.reset_kubeadm()
         except Exception as err:
             log.error(err)
 
         if load_balancer_vm_id:
-            target_vm_name = vm["name"]
-            kubeconfig_filepath = "/etc/kubernetes/admin.conf"
-            if len(control_plane_vm_ids):
-                cmd = [
-                    "kubectl", f"--kubeconfig={kubeconfig_filepath}", "delete",
-                    "node", target_vm_name
-                ]
-                for id in control_plane_vm_ids:
-                    exitcode, _, _ = nodectl.vm(id).exec(cmd, interval_check=3)
-                    if exitcode == 0:
-                        break
-
-            lbctl = nodectl.vm(load_balancer_vm_id)
-            cmd = [
-                "/usr/local/bin/delete_backend_server_haproxy_cfg.py", "-c",
-                "/etc/haproxy/haproxy.cfg", "-n", vm_id, "--backend-name",
-                "control-plane"
-            ]
-            exitcode, stdout, stderr = lbctl.exec(cmd, interval_check=3)
+            if control_plane_vm_id:
+                nodectl.ctlplvmctl(control_plane_vm_id).delete_node(vm_name)
+            lbctl = nodectl.lbctl(load_balancer_vm_id)
+            exitcode, stdout, stderr = lbctl.rm_backend("control-plane", vm_id)
             if exitcode != 0:
                 log.error(str(stderr))
-            lbctl.exec(["systemctl", "reload", "haproxy"], interval_check=3)
+            lbctl.reload_haproxy()
 
-        vmctl.shutdown()
-        vmctl.wait_for_shutdown()
-        vmctl.delete()
+        ctlplvmctl.shutdown()
+        ctlplvmctl.wait_for_shutdown()
+        ctlplvmctl.delete()
         return vm_id

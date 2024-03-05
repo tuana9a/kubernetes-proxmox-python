@@ -2,10 +2,10 @@ import sys
 
 from app.cmd.core import Cmd
 from app.cmd.ctlpl import ControlPlaneCmd
-from app.cmd.kube import KubeCmd
 from app.cmd.lb import LbCmd
 from app.cmd.help import TreeCmd
 from app.cmd.worker import WorkerCmd
+from app.cmd.vm import VmCmd
 
 
 class MainCmd(Cmd):
@@ -14,9 +14,9 @@ class MainCmd(Cmd):
         super().__init__("kp",
                          childs=[
                              ControlPlaneCmd(),
-                             KubeCmd(),
                              LbCmd(),
                              WorkerCmd(),
+                             VmCmd(),
                              TreeCmd(parent=self)
                          ])
 

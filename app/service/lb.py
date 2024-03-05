@@ -6,7 +6,7 @@ from app.logger import Logger
 from app import util
 
 
-class LbController:
+class LbService:
 
     def __init__(self, nodectl: NodeController, log=Logger.DEBUG) -> None:
         self.nodectl = nodectl
@@ -42,7 +42,7 @@ class LbController:
         new_vm_name = f"{vm_name_prefix}{new_vm_id}"
         nodectl.clone(lb_template_id, new_vm_id)
 
-        vmctl = nodectl.vm(new_vm_id)
+        vmctl = nodectl.vmctl(new_vm_id)
         vmctl.update_config(
             name=new_vm_name,
             ciuser=vm_username,
@@ -55,7 +55,7 @@ class LbController:
 
         vmctl.resize_disk(disk="scsi0", size="+20G")
         vmctl.startup()
-        vmctl.wait_for_guest_agent(timeout=5 * 60)
+        vmctl.wait_for_guest_agent()
 
         if not haproxy_cfg:
             msg = "haproxy_cfg is not set, skipping copy haproxy config"

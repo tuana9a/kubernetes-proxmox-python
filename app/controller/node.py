@@ -1,6 +1,6 @@
 from proxmoxer import ProxmoxAPI
 from app.logger import Logger
-from app.controller.vm import VmController
+from app.controller.vm import *
 from app.error import *
 from app import util
 
@@ -38,8 +38,20 @@ class NodeController:
             verify_ssl=False,
         )
 
-    def vm(self, vm_id):
+    def vmctl(self, vm_id):
         return VmController(self.api, self.node, vm_id, log=self.log)
+
+    def ctlplvmctl(self, vm_id):
+        return ControlPlaneVmController(self.api,
+                                        self.node,
+                                        vm_id,
+                                        log=self.log)
+
+    def wkctl(self, vm_id):
+        return WorkerVmController(self.api, self.node, vm_id, log=self.log)
+
+    def lbctl(self, vm_id):
+        return LbVmController(self.api, self.node, vm_id, log=self.log)
 
     def clone(self, old_id, new_id):
         api = self.api
@@ -57,6 +69,20 @@ class NodeController:
         vm_list = r
         log.debug(node, "list_vm", len(vm_list), vm_list)
         return vm_list
+
+    def find_vm(self, vm_id: int):
+        api = self.api
+        node = self.node
+        log = self.log
+        r = api.nodes(node).qemu.get()
+        vm_list = r
+        for x in vm_list:
+            id = x["vmid"]
+            if str(id) == str(vm_id):
+                log.debug("vm", x)
+                return x
+
+        raise VmNotFoundError(vm_id)
 
     def describe_network(self, network: str):
         api = self.api
@@ -89,7 +115,7 @@ class NodeController:
         vm_list = self.list_vm()
         for vm in vm_list:
             id = vm["vmid"]
-            config = self.vm(id).current_config()
+            config = self.vmctl(id).current_config()
             ifconfig0 = config.get("ipconfig0", None)
             if not ifconfig0: continue
             ip = util.ProxmoxUtil.extract_ip(ifconfig0)

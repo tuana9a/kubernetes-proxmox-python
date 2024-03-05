@@ -4,7 +4,7 @@ from app.cmd.core import Cmd
 from app.config import load_config
 from app.logger import Logger
 from app.controller.node import NodeController
-from app.controller.lb import LbController
+from app.service.lb import LbService
 
 
 class LbCmd(Cmd):
@@ -29,5 +29,5 @@ class CreateLbCmd(Cmd):
                                  proxmox_node,
                                  log=log)
 
-        lbctl = LbController(nodectl, log=log)
-        lbctl.create_lb(**cfg)
+        service = LbService(nodectl, log=log)
+        service.create_lb(**cfg)

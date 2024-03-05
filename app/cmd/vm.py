@@ -33,7 +33,7 @@ class RebootVmCmd(Cmd):
         nodectl = NodeController(NodeController.create_proxmox_client(**cfg),
                                  proxmox_node,
                                  log=log)
-        vmctl = nodectl.vm(vm_id)
+        vmctl = nodectl.vmctl(vm_id)
         vmctl.reboot()
 
 
@@ -43,7 +43,7 @@ class RemoveVmCmd(Cmd):
         super().__init__("remove", aliases=["rm"])
 
     def _setup(self):
-        self.parser.add_argument("vmid", type=int, required=False)
+        self.parser.add_argument("vmid", type=int)
 
     def _run(self):
         urllib3.disable_warnings()
@@ -57,7 +57,7 @@ class RemoveVmCmd(Cmd):
         nodectl = NodeController(NodeController.create_proxmox_client(**cfg),
                                  proxmox_node,
                                  log=log)
-        vmctl = nodectl.vm(vm_id)
+        vmctl = nodectl.vmctl(vm_id)
         vmctl.shutdown()
         vmctl.wait_for_shutdown()
         vmctl.delete()

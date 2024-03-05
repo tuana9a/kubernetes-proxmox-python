@@ -3,6 +3,9 @@ import time
 from typing import List
 from proxmoxer import ProxmoxAPI
 from app.logger import Logger
+from app.error import *
+
+TIMEOUT = 30 * 60  # 30 min
 
 
 class VmController:
@@ -17,7 +20,7 @@ class VmController:
         self.vm_id = vm_id
         self.log = log
 
-    def exec(self, cmd: List[str], timeout=30 * 60, interval_check=10):
+    def exec(self, cmd: List[str], timeout=TIMEOUT, interval_check=10):
         api = self.api
         node = self.node
         vm_id = self.vm_id
@@ -27,9 +30,9 @@ class VmController:
         log.debug(node, vm_id, "exec", cmd, r)
         pid = r["pid"]
         exited = 0
-        stdout = None
-        stderr = None
-        exitcode = None
+        stdout: str = None
+        stderr: str = None
+        exitcode: int = None
         while True:
             log.debug(node, vm_id, "exec", pid, "wait", duration)
             time.sleep(interval_check)
@@ -52,7 +55,7 @@ class VmController:
             log.debug(node, vm_id, "exec", pid, "stderr\n" + str(stderr))
         return exitcode, stdout, stderr
 
-    def wait_for_guest_agent(self, timeout=10 * 60, interval_check=15):
+    def wait_for_guest_agent(self, timeout=TIMEOUT, interval_check=15):
         api = self.api
         node = self.node
         vm_id = self.vm_id
@@ -68,10 +71,10 @@ class VmController:
                 api.nodes(node).qemu(vm_id).agent.ping.post()
                 break
             except Exception as err:
-                log.debug(node, vm_id, "wait_for_guest_agent", err)
+                log.debug(node, vm_id, "wait_for_guest_agent", duration)
         log.debug(node, vm_id, "wait_for_guest_agent", "READY")
 
-    def wait_for_shutdown(self, timeout=10 * 60, interval_check=15):
+    def wait_for_shutdown(self, timeout=TIMEOUT, interval_check=15):
         api = self.api
         node = self.node
         vm_id = self.vm_id
@@ -183,3 +186,121 @@ class VmController:
         r = api.nodes(node).qemu(vm_id).agent("file-read").get(file=filepath)
         log.debug(node, vm_id, "read_file", r)
         return r
+
+
+class KubeVmController(VmController):
+
+    def __init__(self,
+                 api: ProxmoxAPI,
+                 node: str,
+                 vm_id: str,
+                 log=Logger.DEBUG) -> None:
+        super().__init__(api, node, vm_id, log)
+
+    def reset_kubeadm(self, cmd=["kubeadm", "reset", "-f"]):
+        return self.exec(cmd)
+
+
+class ControlPlaneVmController(KubeVmController):
+
+    def __init__(self,
+                 api: ProxmoxAPI,
+                 node: str,
+                 vm_id: str,
+                 log=Logger.DEBUG) -> None:
+        super().__init__(api, node, vm_id, log)
+
+    def create_join_cmd(
+            self,
+            cmd=["kubeadm", "token", "create", "--print-join-command"],
+            timeout=TIMEOUT,
+            interval_check=3):
+        log = self.log
+        exitcode, stdout, stderr = self.exec(cmd,
+                                             timeout=timeout,
+                                             interval_check=interval_check)
+        if exitcode != 0:
+            raise FailedToCreateJoinCmd(stderr)
+        join_cmd: List[str] = stdout.split()
+        log.debug("join_cmd", join_cmd)
+        return join_cmd
+
+    def create_ctlpl_join_cmd(
+            self,
+            cmd=["kubeadm", "token", "create", "--print-join-command"],
+            timeout=TIMEOUT,
+            interval_check=3):
+        log = self.log
+        join_cmd = self.create_join_cmd(cmd,
+                                        timeout=timeout,
+                                        interval_check=interval_check)
+        join_cmd.append("--control-plane")
+        log.debug("join_cmd", join_cmd)
+        return join_cmd
+
+    def drain_node(self,
+                   node_name: str,
+                   kubeconfig_filepath="/etc/kubernetes/admin.conf"):
+        cmd = [
+            "kubectl", f"--kubeconfig={kubeconfig_filepath}", "drain",
+            "--ignore-daemonsets", node_name
+        ]
+        # 30 mins should be enough
+        return self.exec(cmd, interval_check=5, timeout=30 * 60)
+
+    def delete_node(self,
+                    node_name,
+                    kubeconfig_filepath="/etc/kubernetes/admin.conf"):
+        cmd = [
+            "kubectl", f"--kubeconfig={kubeconfig_filepath}", "delete", "node",
+            node_name
+        ]
+        return self.exec(cmd, interval_check=5)
+
+    def ensure_cert_dirs(self, dirs=["/etc/kubernetes/pki/etcd"]):
+        for d in dirs:
+            self.exec(["mkdir", "-p", d], interval_check=3)
+
+    def cat_kubeconfig(self, filepath="/etc/kubernetes/admin.conf"):
+        cmd = ["cat", filepath]
+        return self.exec(cmd)
+
+
+class WorkerVmController(KubeVmController):
+
+    def __init__(self,
+                 api: ProxmoxAPI,
+                 node: str,
+                 vm_id: str,
+                 log=Logger.DEBUG) -> None:
+        super().__init__(api, node, vm_id, log)
+
+
+class LbVmController(VmController):
+
+    def __init__(self,
+                 api: ProxmoxAPI,
+                 node: str,
+                 vm_id: str,
+                 log=Logger.DEBUG) -> None:
+        super().__init__(api, node, vm_id, log)
+
+    def add_backend(self, backend_name: str, server_name: str,
+                    server_endpoint):
+        cmd = [
+            "/usr/local/bin/config_haproxy.py", "-c",
+            "/etc/haproxy/haproxy.cfg", "backend", backend_name, "add",
+            server_name, server_endpoint
+        ]
+        return self.exec(cmd)
+
+    def rm_backend(self, backend_name: str, server_name: str):
+        cmd = [
+            "/usr/local/bin/config_haproxy.py", "-c",
+            "/etc/haproxy/haproxy.cfg", "backend", backend_name, "rm",
+            server_name
+        ]
+        return self.exec(cmd)
+
+    def reload_haproxy(self):
+        self.exec(["systemctl", "reload", "haproxy"], interval_check=3)

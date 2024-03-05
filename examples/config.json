@@ -17,7 +17,7 @@
         "192.168.56.2",
         "192.168.56.3"
     ],
-    "control_plane_vm_ids": [121],
+    "control_plane_vm_id": 122,
     "cni_manifest_file": "./examples/kube-flannel.yaml",
     "pod_cidr": "10.244.0.0/16",
     "svc_cidr": "10.233.0.0/16",
