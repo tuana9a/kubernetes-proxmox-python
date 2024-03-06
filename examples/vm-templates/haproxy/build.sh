@@ -21,7 +21,7 @@ STORAGE=local # TODO: your storage name
 
 qm destroy $TEMPLATE_VM_ID
 qm create $TEMPLATE_VM_ID --cores $TEMPLATE_VM_CORE_COUNT --memory $TEMPLATE_VM_MEM --scsihw virtio-scsi-pci
-qm set $TEMPLATE_VM_ID --scsi0 $STORAGE:0,import-from=./$IMAGE_FILE
+qm set $TEMPLATE_VM_ID --scsi0 $STORAGE:0,import-from=$PWD/$IMAGE_FILE
 qm set $TEMPLATE_VM_ID --ide2 $STORAGE:cloudinit
 qm set $TEMPLATE_VM_ID --boot order=scsi0
 qm set $TEMPLATE_VM_ID --serial0 socket --vga serial0
