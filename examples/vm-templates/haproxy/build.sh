@@ -19,7 +19,7 @@ TEMPLATE_VM_CORE_COUNT=2
 TEMPLATE_VM_MEM=2048
 STORAGE=local # TODO: your storage name
 
-qm rm $TEMPLATE_VM_ID
+qm destroy $TEMPLATE_VM_ID
 qm create $TEMPLATE_VM_ID --cores $TEMPLATE_VM_CORE_COUNT --memory $TEMPLATE_VM_MEM --scsihw virtio-scsi-pci
 qm set $TEMPLATE_VM_ID --scsi0 $STORAGE:0,import-from=./$IMAGE_FILE
 qm set $TEMPLATE_VM_ID --ide2 $STORAGE:cloudinit
