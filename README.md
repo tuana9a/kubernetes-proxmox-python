@@ -21,6 +21,8 @@ iface vmbr56 inet static
 
 # Prefare vm template
 
+See [./examples/vm-templates/](./examples/vm-templates/)
+
 Login to your proxmox host as root user
 
 Install necessary tools to build vm image
