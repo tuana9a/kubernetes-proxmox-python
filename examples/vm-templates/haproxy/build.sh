@@ -17,10 +17,11 @@ IMAGE_FILE=haproxy.img
 TEMPLATE_VM_ID=8080 # TODO: your template id
 TEMPLATE_VM_CORE_COUNT=2
 TEMPLATE_VM_MEM=2048
-qm create $TEMPLATE_VM_ID --cores $TEMPLATE_VM_CORE_COUNT --memory $TEMPLATE_VM_MEM --scsihw virtio-scsi-pci
-
 STORAGE=local # TODO: your storage name
-qm set $TEMPLATE_VM_ID --scsi0 $STORAGE:0,import-from=$PWD/$IMAGE_FILE
+
+qm rm $TEMPLATE_VM_ID
+qm create $TEMPLATE_VM_ID --cores $TEMPLATE_VM_CORE_COUNT --memory $TEMPLATE_VM_MEM --scsihw virtio-scsi-pci
+qm set $TEMPLATE_VM_ID --scsi0 $STORAGE:0,import-from=./$IMAGE_FILE
 qm set $TEMPLATE_VM_ID --ide2 $STORAGE:cloudinit
 qm set $TEMPLATE_VM_ID --boot order=scsi0
 qm set $TEMPLATE_VM_ID --serial0 socket --vga serial0
