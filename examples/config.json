@@ -1,8 +1,11 @@
 {
+    "proxmox_verify_ssl": false,
     "proxmox_node": "pve",
     "proxmox_host": "10.14.16.2",
     "proxmox_user": "root@pam",
     "proxmox_password": "",
+    "proxmox_token_name": "test",
+    "proxmox_token_value": "uuid",
     "control_plane_template_id": 9000,
     "worker_template_id": 9000,
     "lb_template_id": 9001,
@@ -11,13 +14,13 @@
         129
     ],
     "vm_network_name": "vmbr56",
-    "vm_ssh_keys": "ssh-rsa tuana9a@tuana9a",
+    "vm_ssh_keys": "ssh-rsa PUBKEY tuana9a@tuana9a",
     "preserved_ips": [
         "192.168.56.1",
         "192.168.56.2",
         "192.168.56.3"
     ],
-    "control_plane_vm_ids": [121],
+    "control_plane_vm_id": 122,
     "cni_manifest_file": "./examples/kube-flannel.yaml",
     "pod_cidr": "10.244.0.0/16",
     "svc_cidr": "10.233.0.0/16",
