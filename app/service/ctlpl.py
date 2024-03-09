@@ -43,6 +43,7 @@ class ControlPlaneService:
                              vm_network_name,
                              control_plane_template_id,
                              pod_cidr,
+                             svc_cidr=None,
                              preserved_ips=[],
                              vm_id_range=[0, 9999],
                              vm_name_prefix="i-",
@@ -94,7 +95,9 @@ class ControlPlaneService:
         # SECTION: standalone control plane
         if not is_multiple_control_planes:
             exitcode, _, _ = ctlplvmctl.kubeadm().init(
-                control_plane_endpoint=new_vm_id, pod_cidr=pod_cidr)
+                control_plane_endpoint=new_vm_id,
+                pod_cidr=pod_cidr,
+                svc_cidr=svc_cidr)
 
             if not cni_manifest_file:
                 log.debug("skip apply cni step")
@@ -128,7 +131,8 @@ class ControlPlaneService:
                 control_plane_endpoint = vm_ip
             exitcode, _, _ = ctlplvmctl.kubeadm().init(
                 control_plane_endpoint=control_plane_endpoint,
-                pod_cidr=pod_cidr)
+                pod_cidr=pod_cidr,
+                svc_cidr=svc_cidr)
 
             if not cni_manifest_file:
                 log.debug("skip ini cni step")

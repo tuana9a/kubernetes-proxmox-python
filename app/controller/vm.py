@@ -196,7 +196,11 @@ class _KubeadmExecutor():
         vmctl = self.vmctl
         return vmctl.exec(cmd)
 
-    def init(self, control_plane_endpoint, pod_cidr, timeout=10 * 60):
+    def init(self,
+             control_plane_endpoint,
+             pod_cidr,
+             svc_cidr=None,
+             timeout=10 * 60):
         vmctl = self.vmctl
         cmd = [
             "kubeadm",
@@ -204,6 +208,8 @@ class _KubeadmExecutor():
             f"--control-plane-endpoint={control_plane_endpoint}"
             f"--pod-network-cidr={pod_cidr}",
         ]
+        if svc_cidr:
+            cmd.append(f"--service-cidr={svc_cidr}")
         return vmctl.exec(cmd, timeout=timeout)
 
     def create_join_command(
