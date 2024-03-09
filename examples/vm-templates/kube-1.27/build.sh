@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ -z $TEMPLATE_VM_ID ]; then
+    echo TEMPLATE_VM_ID is not set, exitting...
+    exit 1
+fi
+
 # SECTION: build os image
 BASE_IMAGE_FILE=bionic-server-cloudimg-amd64.img
 IMAGE_FILE=kube.img
@@ -11,15 +16,15 @@ cp $BASE_IMAGE_FILE $IMAGE_FILE
 virt-customize -a $IMAGE_FILE --install qemu-guest-agent
 virt-customize -a $IMAGE_FILE --run userdata.sh
 virt-customize -a $IMAGE_FILE --copy-in $PWD/containerd/config.toml:/etc/containerd/
-# virt-customize -a $IMAGE_FILE --install nfs-common # Personal use with https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner
+# [OPTIONAL] Personal use with https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner
+virt-customize -a $IMAGE_FILE --install nfs-common
 
+# SECTION: create vm template
 IMAGE_FILE=kube.img
-TEMPLATE_VM_ID=9127 # TODO: your template id
 TEMPLATE_VM_CORE_COUNT=4
 TEMPLATE_VM_MEM=8192
 STORAGE=local # TODO: your storage name
 
-qm destroy $TEMPLATE_VM_ID
 qm create $TEMPLATE_VM_ID --cores $TEMPLATE_VM_CORE_COUNT --memory $TEMPLATE_VM_MEM --scsihw virtio-scsi-pci
 qm set $TEMPLATE_VM_ID --scsi0 $STORAGE:0,import-from=$PWD/$IMAGE_FILE
 qm set $TEMPLATE_VM_ID --ide2 $STORAGE:cloudinit

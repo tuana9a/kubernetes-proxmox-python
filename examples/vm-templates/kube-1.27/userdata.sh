@@ -1,19 +1,23 @@
 #!/bin/bash
 
-# Disable swap
-swapoff -a -v
+# Setup container runtime https://kubernetes.io/docs/setup/production-environment/container-runtimes/
+cat <<EOF | tee /etc/modules-load.d/k8s.conf
+overlay
+br_netfilter
+EOF
 
-# To avoid [ERROR FileContent--proc-sys-net-bridge-bridge-nf-call-iptables]: /proc/sys/net/bridge/bridge-nf-call-iptables does not exist
-# Solution https://stackoverflow.com/questions/44125020/cant-install-kubernetes-on-vagrant
-echo br_netfilter > /etc/modules-load.d/br_netfilter.conf
-systemctl restart systemd-modules-load.service
+modprobe overlay
+modprobe br_netfilter
 
-echo 1 > /proc/sys/net/bridge/bridge-nf-call-iptables
-echo 1 > /proc/sys/net/bridge/bridge-nf-call-ip6tables
+# Sysctl params required by setup, params persist across reboots
+cat <<EOF | tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
 
-echo net.ipv4.ip_forward=1 >> /etc/sysctl.conf
-echo net.bridge.bridge-nf-call-iptables=1 >> /etc/sysctl.conf
-sysctl -p
+# Apply sysctl params without reboot
+sysctl --system
 
 # Add Docker's official GPG key:
 apt-get update
@@ -38,3 +42,22 @@ echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.
 # Install kubernetes dependencies
 apt-get update
 apt install -y kubelet kubeadm kubectl
+
+# [OPTIONAL] Install etcdctl https://github.com/etcd-io/etcd/releases/
+ETCD_VER=v3.5.12
+
+# Choose either URL
+GOOGLE_URL=https://storage.googleapis.com/etcd
+GITHUB_URL=https://github.com/etcd-io/etcd/releases/download
+DOWNLOAD_URL=${GITHUB_URL}
+
+rm -f /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
+rm -rf /tmp/etcd-${ETCD_VER} && mkdir -p /tmp/etcd-${ETCD_VER}
+
+curl -L ${DOWNLOAD_URL}/${ETCD_VER}/etcd-${ETCD_VER}-linux-amd64.tar.gz -o /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
+tar xzvf /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz -C /tmp/etcd-${ETCD_VER} --strip-components=1
+rm -f /tmp/etcd-${ETCD_VER}-linux-amd64.tar.gz
+
+cp /tmp/etcd-${ETCD_VER}/etcd /usr/local/bin/
+cp /tmp/etcd-${ETCD_VER}/etcdctl /usr/local/bin/
+cp /tmp/etcd-${ETCD_VER}/etcdutl /usr/local/bin/
