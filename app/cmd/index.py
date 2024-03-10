@@ -6,6 +6,7 @@ from app.cmd.lb import LbCmd
 from app.cmd.help import TreeCmd
 from app.cmd.worker import WorkerCmd
 from app.cmd.vm import VmCmd
+from app.cmd.kubeadm import KubeadmCmd
 
 
 class MainCmd(Cmd):
@@ -17,6 +18,7 @@ class MainCmd(Cmd):
                              LbCmd(),
                              WorkerCmd(),
                              VmCmd(),
+                             KubeadmCmd(),
                              TreeCmd(parent=self)
                          ])
 

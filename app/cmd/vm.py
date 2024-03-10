@@ -28,9 +28,8 @@ class RebootVmCmd(Cmd):
         ids = args.ids
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
-        nodectl = NodeController(NodeController.create_proxmox_client(**cfg),
-                                 proxmox_node,
-                                 log=log)
+        proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
+        nodectl = NodeController(proxmox_client, proxmox_node, log=log)
         for id in ids:
             vmctl = nodectl.vmctl(id)
             vmctl.reboot()
@@ -51,9 +50,8 @@ class RemoveVmCmd(Cmd):
         ids = args.ids
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
-        nodectl = NodeController(NodeController.create_proxmox_client(**cfg),
-                                 proxmox_node,
-                                 log=log)
+        proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
+        nodectl = NodeController(proxmox_client, proxmox_node, log=log)
         for id in ids:
             vmctl = nodectl.vmctl(id)
             vmctl.shutdown()

@@ -95,7 +95,7 @@ class ControlPlaneService:
         # SECTION: standalone control plane
         if not is_multiple_control_planes:
             exitcode, _, _ = ctlplvmctl.kubeadm().init(
-                control_plane_endpoint=new_vm_id,
+                control_plane_endpoint=new_vm_ip,
                 pod_cidr=pod_cidr,
                 svc_cidr=svc_cidr)
 

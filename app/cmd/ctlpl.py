@@ -6,6 +6,7 @@ from app.config import load_config
 from app.logger import Logger
 from app.controller.node import NodeController
 from app.service.ctlpl import ControlPlaneService
+from app import util
 
 
 class ControlPlaneCmd(Cmd):
@@ -17,6 +18,7 @@ class ControlPlaneCmd(Cmd):
                              DeleteControlPlaneCmd(),
                              CatKubeConfigCmd(),
                              CopyKubeCertsCmd(),
+                             JoinControlPlaneCmd(),
                          ],
                          aliases=["ctlpl"])
 
@@ -32,10 +34,8 @@ class CreateControlPlaneCmd(Cmd):
 
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
-
-        nodectl = NodeController(NodeController.create_proxmox_client(**cfg),
-                                 proxmox_node,
-                                 log=log)
+        proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
+        nodectl = NodeController(proxmox_client, proxmox_node, log=log)
 
         service = ControlPlaneService(nodectl, log=log)
         service.create_control_plane(**cfg)
@@ -61,10 +61,8 @@ class DeleteControlPlaneCmd(Cmd):
             raise ValueError("vm_id is missing")
 
         proxmox_node = cfg["proxmox_node"]
-
-        nodectl = NodeController(NodeController.create_proxmox_client(**cfg),
-                                 proxmox_node,
-                                 log=log)
+        proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
+        nodectl = NodeController(proxmox_client, proxmox_node, log=log)
         clusterctl = ControlPlaneService(nodectl, log=log)
         clusterctl.delete_control_plane(vm_id, **cfg)
 
@@ -89,9 +87,8 @@ class CatKubeConfigCmd(Cmd):
 
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
-        nodectl = NodeController(NodeController.create_proxmox_client(**cfg),
-                                 proxmox_node,
-                                 log=log)
+        proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
+        nodectl = NodeController(proxmox_client, proxmox_node, log=log)
         ctlplvmctl = nodectl.ctlplvmctl(vm_id)
         _, stdout, _ = ctlplvmctl.cat_kubeconfig(filepath)
         print(stdout)
@@ -115,12 +112,53 @@ class CopyKubeCertsCmd(Cmd):
 
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
-
-        nodectl = NodeController(NodeController.create_proxmox_client(**cfg),
-                                 proxmox_node,
-                                 log=log)
+        proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
+        nodectl = NodeController(proxmox_client, proxmox_node, log=log)
 
         nodectl.ctlplvmctl(dest_id).ensure_cert_dirs()
 
         service = ControlPlaneService(nodectl, log=log)
         service.copy_kube_certs(source_id, dest_id)
+
+
+class JoinControlPlaneCmd(Cmd):
+
+    def __init__(self) -> None:
+        super().__init__("join")
+
+    def _setup(self):
+        self.parser.add_argument("ctlplid", type=int)
+        self.parser.add_argument("ctlplids", nargs="+")
+
+    def _run(self):
+        urllib3.disable_warnings()
+        log = Logger.from_env()
+        args = self.parsed_args
+        control_plane_id = args.ctlplid
+        control_plane_ids = args.ctlplids
+
+        cfg = load_config(log=log)
+        proxmox_node = cfg["proxmox_node"]
+        proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
+        nodectl = NodeController(proxmox_client, proxmox_node, log=log)
+        service = ControlPlaneService(nodectl, log=log)
+        load_balancer_vm_id = cfg["load_balancer_vm_id"]
+        lbctl = nodectl.lbctl(load_balancer_vm_id)
+        join_cmd = nodectl.ctlplvmctl(control_plane_id).kubeadm(
+        ).create_join_command(is_control_plane=True)
+        for id in control_plane_ids:
+            ctlplvmctl = nodectl.ctlplvmctl(id)
+            ctlplvmctl.ensure_cert_dirs()
+            service.copy_kube_certs(control_plane_id, id)
+            current_config = ctlplvmctl.current_config()
+            ifconfig0 = current_config.get("ipconfig0", None)
+            if not ifconfig0:
+                raise Exception("can not detect the vm ip")
+            vm_ip = util.ProxmoxUtil.extract_ip(ifconfig0)
+            exitcode, _, stderr = lbctl.add_backend("control-plane", id,
+                                                    f"{vm_ip}:6443")
+            if exitcode != 0:
+                log.error(stderr)
+                raise Exception("some thing wrong with add_backend")
+            lbctl.reload_haproxy()
+            ctlplvmctl.exec(join_cmd)

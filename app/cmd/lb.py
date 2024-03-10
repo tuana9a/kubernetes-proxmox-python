@@ -23,11 +23,8 @@ class CreateLbCmd(Cmd):
         log = Logger.from_env()
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
-
-        nodectl = NodeController(NodeController.create_proxmox_client(**cfg,
-                                                                      log=log),
-                                 proxmox_node,
-                                 log=log)
+        proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
+        nodectl = NodeController(proxmox_client, proxmox_node, log=log)
 
         service = LbService(nodectl, log=log)
         service.create_lb(**cfg)

@@ -205,7 +205,7 @@ class _KubeadmExecutor():
         cmd = [
             "kubeadm",
             "init",
-            f"--control-plane-endpoint={control_plane_endpoint}"
+            f"--control-plane-endpoint={control_plane_endpoint}",
             f"--pod-network-cidr={pod_cidr}",
         ]
         if svc_cidr:

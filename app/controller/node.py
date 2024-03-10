@@ -53,6 +53,9 @@ class NodeController:
     def lbctl(self, vm_id):
         return LbVmController(self.api, self.node, vm_id, log=self.log)
 
+    def kubeadmctl(self, vm_id):
+        return KubeVmController(self.api, self.node, vm_id, log=self.log)
+
     def clone(self, old_id, new_id):
         api = self.api
         node = self.node

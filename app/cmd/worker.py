@@ -31,11 +31,8 @@ class CreateWorkerCmd(Cmd):
 
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
-
-        nodectl = NodeController(NodeController.create_proxmox_client(**cfg,
-                                                                      log=log),
-                                 proxmox_node,
-                                 log=log)
+        proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
+        nodectl = NodeController(proxmox_client, proxmox_node, log=log)
 
         service = WorkerService(nodectl, log=log)
         service.create_worker(**cfg)
@@ -61,9 +58,8 @@ class DeleteWorkerCmd(Cmd):
 
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
-        nodectl = NodeController(NodeController.create_proxmox_client(**cfg),
-                                 proxmox_node,
-                                 log=log)
+        proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
+        nodectl = NodeController(proxmox_client, proxmox_node, log=log)
 
         service = WorkerService(nodectl, log=log)
         service.delete_worker(vm_id, **cfg)
@@ -86,9 +82,8 @@ class JoinWorkerCmd(Cmd):
         control_plane_id = args.ctlplid
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
-        nodectl = NodeController(NodeController.create_proxmox_client(**cfg),
-                                 proxmox_node,
-                                 log=log)
+        proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
+        nodectl = NodeController(proxmox_client, proxmox_node, log=log)
 
         join_cmd = nodectl.ctlplvmctl(
             control_plane_id).kubeadm().create_join_command()
