@@ -1,12 +1,12 @@
 import sys
 
-from app.cmd.core import Cmd
-from app.cmd.ctlpl import ControlPlaneCmd
-from app.cmd.lb import LbCmd
-from app.cmd.help import TreeCmd
-from app.cmd.worker import WorkerCmd
-from app.cmd.vm import VmCmd
-from app.cmd.kubeadm import KubeadmCmd
+from cli.core import Cmd
+from cli.ctlpl import ControlPlaneCmd
+from cli.lb import LbCmd
+from cli.help import TreeCmd
+from cli.worker import WorkerCmd
+from cli.vm import VmCmd
+from cli.kubeadm import KubeadmCmd
 
 
 class MainCmd(Cmd):

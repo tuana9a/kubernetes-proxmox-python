@@ -1,7 +1,7 @@
 import urllib3
 
 from app import util
-from app.cmd.core import Cmd
+from cli.core import Cmd
 from app.config import load_config
 from app.logger import Logger
 from app.controller.node import NodeController

@@ -7,6 +7,6 @@ setuptools.setup(name="kp",
                  author="Nguyen Minh Tuan",
                  author_email="tuana9a@gmail.com",
                  entry_points={"console_scripts": [
-                     "kp=app.cmd.index:main",
+                     "kp=cli.main:main",
                  ]},
                  install_requires=["requests==2.31.0", "proxmoxer==2.0.1"])

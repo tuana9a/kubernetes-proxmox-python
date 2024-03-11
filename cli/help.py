@@ -1,4 +1,4 @@
-from app.cmd.core import Cmd
+from cli.core import Cmd
 
 
 class TreeCmd(Cmd):
