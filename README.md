@@ -21,7 +21,7 @@ iface vmbr56 inet static
 
 # Prefare vm template
 
-See [./examples/vm-templates/](./examples/vm-templates/)
+See [cloud-imgs](cloud-imgs/)
 
 Login to your proxmox host as root user
 
@@ -41,14 +41,14 @@ git clone https://github.com/tuana9a/kubernetes-proxmox-cluster-autoscaler.git
 Build worker template
 
 ```bash
-cd examples/vm-templates/kube-1.27/
+cd cloud-imgs/kube-1.27/
 ./build.sh
 ```
 
 Build load balancer template
 
 ```bash
-cd examples/vm-templates/haproxy/
+cd cloud-imgs/haproxy/
 ./build.sh
 ```
 

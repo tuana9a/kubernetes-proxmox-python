@@ -16,6 +16,7 @@ cp $BASE_IMAGE_FILE $IMAGE_FILE
 virt-customize -a $IMAGE_FILE --install qemu-guest-agent
 virt-customize -a $IMAGE_FILE --install haproxy
 virt-customize -a $IMAGE_FILE --copy-in config_haproxy.py:/usr/local/bin/
+virt-customize -a $IMAGE_FILE --run userdata.sh # Optional
 
 # SECTION: create template vm
 IMAGE_FILE=haproxy.img
