@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 if [ -z $TEMPLATE_VM_ID ]; then
     echo TEMPLATE_VM_ID is not set, exitting...
     exit 1
