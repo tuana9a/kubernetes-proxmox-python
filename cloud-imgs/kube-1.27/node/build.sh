@@ -13,6 +13,7 @@ if [ ! -f $BASE_IMAGE_FILE ]; then
 fi
 rm -f $IMAGE_FILE
 cp $BASE_IMAGE_FILE $IMAGE_FILE
+qemu-img resize $IMAGE_FILE +3G
 virt-customize -a $IMAGE_FILE --install qemu-guest-agent
 virt-customize -a $IMAGE_FILE --run userdata.sh
 virt-customize -a $IMAGE_FILE --copy-in $PWD/containerd/config.toml:/etc/containerd/
