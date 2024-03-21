@@ -15,7 +15,7 @@ if [ ! -f $BASE_IMAGE_FILE ]; then
 fi
 rm -f $IMAGE_FILE
 cp $BASE_IMAGE_FILE $IMAGE_FILE
-qemu-resize $IMAGE_FILE +20G
+qemu-img resize $IMAGE_FILE +20G
 virt-resize --format qcow2 --expand /dev/sda1 $BASE_IMAGE_FILE $IMAGE_FILE
 virt-customize -a $IMAGE_FILE --install qemu-guest-agent
 virt-customize -a $IMAGE_FILE --run userdata.sh
