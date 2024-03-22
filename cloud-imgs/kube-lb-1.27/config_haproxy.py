@@ -213,7 +213,7 @@ class AddBackendCmd(Cmd):
         if not is_need_to_save:
             exit(0)
 
-        new_content = "\n".join(lines).strip()
+        new_content = "\n".join(lines).strip() + "\n"
         print(new_content)
 
         with open(config_path, "w") as f:
@@ -297,7 +297,7 @@ class RmBackendCmd(Cmd):
         if not is_need_to_save:
             exit(0)
 
-        new_content = "\n".join(lines).strip()
+        new_content = "\n".join(lines).strip() + "\n"
         print(new_content)
 
         with open(config_path, "w") as f:

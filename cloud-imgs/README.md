@@ -6,6 +6,12 @@ cd into each dir and run the build.sh script
 
 [How to fix partition table after virt-resize rearranges it](https://serverfault.com/questions/976792/how-to-fix-partition-table-after-virt-resize-rearranges-it-kvm)
 
+If you see the following message when build os image then probaly it will failed to boot later
+
+`Expanding /dev/sda1 (now /dev/sda3) using the ‘resize2fs’ method `
+
+To fix run
+
 ```bash
 virt-rescue cloud.img
 ```
