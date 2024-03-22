@@ -4,7 +4,7 @@ from app.logger import Logger
 
 
 def load_config(config_path=os.getenv("CONFIG_PATH"), log=Logger.DEBUG):
-    log.debug("config_path", config_path)
+    log.info("config_path", config_path)
     if not config_path:
         raise ValueError("CONFIG_PATH is not set")
     if not os.path.exists(config_path):

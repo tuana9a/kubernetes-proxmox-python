@@ -4,8 +4,8 @@ import urllib3
 from cli.core import Cmd
 from app.config import load_config
 from app.logger import Logger
-from app.controller.node import NodeController
-from app.service.ctlpl import ControlPlaneService
+from app.ctler.node import NodeController
+from app.svc.ctlpl import ControlPlaneService
 from app import util
 
 
@@ -55,7 +55,7 @@ class DeleteControlPlaneCmd(Cmd):
         cfg = load_config(log=log)
         args = self.parsed_args
         vm_id = args.vmid or os.getenv("VMID")
-        log.debug("vm_id", vm_id)
+        log.info("vm_id", vm_id)
 
         if not vm_id:
             raise ValueError("vm_id is missing")

@@ -1,7 +1,7 @@
 import os
 import ipaddress
 
-from app.controller.node import NodeController
+from app.ctler.node import NodeController
 from app.logger import Logger
 from app import util
 from app.error import *
@@ -88,7 +88,6 @@ class ControlPlaneService:
             ipconfig0=f"ip={new_vm_ip}/24,gw={network_gw_ip}",
             sshkeys=util.ProxmoxUtil.encode_sshkeys(vm_ssh_keys),
         )
-        ctlplvmctl.resize_disk(disk="scsi0", size="+20G")
         ctlplvmctl.startup()
         ctlplvmctl.wait_for_guest_agent()
 
@@ -100,7 +99,7 @@ class ControlPlaneService:
                 svc_cidr=svc_cidr)
 
             if not cni_manifest_file:
-                log.debug("skip apply cni step")
+                log.info("skip apply cni step")
                 return new_vm_id
 
             cni_filepath = "/root/cni.yaml"
@@ -135,7 +134,7 @@ class ControlPlaneService:
                 svc_cidr=svc_cidr)
 
             if not cni_manifest_file:
-                log.debug("skip ini cni step")
+                log.info("skip ini cni step")
                 return new_vm_id
 
             cni_filepath = "/root/cni.yaml"
@@ -150,7 +149,7 @@ class ControlPlaneService:
         existed_ctlplvmctl = nodectl.ctlplvmctl(control_plane_vm_id)
         join_cmd = existed_ctlplvmctl.kubeadm().create_join_command(
             is_control_plane=True)
-        log.debug("join_cmd", " ".join(join_cmd))
+        log.info("join_cmd", " ".join(join_cmd))
         ctlplvmctl.exec(join_cmd, timeout=20 * 60)
         return new_vm_id
 

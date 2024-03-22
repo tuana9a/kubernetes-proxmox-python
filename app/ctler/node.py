@@ -1,6 +1,10 @@
 from proxmoxer import ProxmoxAPI
 from app.logger import Logger
-from app.controller.vm import *
+from app.ctler.vm import VmController
+from app.ctler.ctlpl import ControlPlaneVmController
+from app.ctler.worker import WorkerVmController
+from app.ctler.kube import KubeVmController
+from app.ctler.lb import LbVmController
 from app.error import *
 from app import util
 
@@ -24,13 +28,13 @@ class NodeController:
                               **kwargs):
         # TODO: verify later with ca cert
         if proxmox_token_name:
-            log.debug("using proxmox_token_name")
+            log.info("using proxmox_token_name")
             return ProxmoxAPI(proxmox_host,
                               user=proxmox_user,
                               token_name=proxmox_token_name,
                               token_value=proxmox_token_value,
                               verify_ssl=proxmox_verify_ssl)
-        log.debug("using proxmox_password")
+        log.info("using proxmox_password")
         return ProxmoxAPI(
             proxmox_host,
             user=proxmox_user,
@@ -61,7 +65,7 @@ class NodeController:
         node = self.node
         log = self.log
         r = api.nodes(node).qemu(old_id).clone.post(newid=new_id)
-        log.debug(node, "clone", old_id, new_id)
+        log.info(node, "clone", old_id, new_id)
         return r
 
     def list_vm(self):
@@ -108,7 +112,7 @@ class NodeController:
         if not new_id:
             log.error("Can't find new vm id")
             raise CanNotGetNewVmId()
-        log.debug("new_id", new_id)
+        log.info("new_id", new_id)
         return new_id
 
     def new_vm_ip(self, ip_pool=[], preserved_ips=[]):
@@ -123,10 +127,10 @@ class NodeController:
             if not ifconfig0: continue
             ip = util.ProxmoxUtil.extract_ip(ifconfig0)
             if ip: exist_ips.add(ip)
-        log.debug("exist_vm_ips", exist_ips)
+        log.debug("exist_ips", exist_ips)
         new_ip = util.find_missing(ip_pool, exist_ips)
         if not new_ip:
             log.error("Can't find new ip")
             raise CanNotGetNewVmIp()
-        log.debug("new_ip", new_ip)
+        log.info("new_ip", new_ip)
         return new_ip

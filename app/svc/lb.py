@@ -1,7 +1,8 @@
 import os
+import time
 import ipaddress
 
-from app.controller.node import NodeController
+from app.ctler.node import NodeController
 from app.logger import Logger
 from app import util
 
@@ -42,8 +43,8 @@ class LbService:
         new_vm_name = f"{vm_name_prefix}{new_vm_id}"
         nodectl.clone(lb_template_id, new_vm_id)
 
-        vmctl = nodectl.vmctl(new_vm_id)
-        vmctl.update_config(
+        lbctl = nodectl.lbctl(new_vm_id)
+        lbctl.update_config(
             name=new_vm_name,
             ciuser=vm_username,
             cipassword=vm_password,
@@ -53,18 +54,34 @@ class LbService:
             ipconfig0=f"ip={new_vm_ip}/24,gw={network_gw_ip}",
         )
 
-        vmctl.resize_disk(disk="scsi0", size="+20G")
-        vmctl.startup()
-        vmctl.wait_for_guest_agent()
+        lbctl.startup()
+        lbctl.wait_for_guest_agent()
 
         if not haproxy_cfg:
             msg = "haproxy_cfg is not set, skipping copy haproxy config"
             log.info(msg)
-            raise Exception(msg)
+            return new_vm_id
 
         if not os.path.exists(haproxy_cfg):
             raise FileNotFoundError(haproxy_cfg)
 
         with open(haproxy_cfg, "r", encoding="utf8") as f:
-            vmctl.write_file(haproxy_cfg_path, f.read())
+            lbctl.write_file(haproxy_cfg_path, f.read())
+            lbctl.reload_haproxy()
         return new_vm_id
+
+    def roll_lb(self, old_vm_id, **kwargs):
+        nodectl = self.nodectl
+        log = self.log
+        vmctl = nodectl.vmctl(old_vm_id)
+        r = vmctl.read_file("/etc/haproxy/haproxy.cfg")
+        content = r["content"]
+        log.info("content", content)
+        backup_cfg_filepath = f"/tmp/haproxy-{time.time_ns()}.cfg"
+        with open(backup_cfg_filepath, "w") as f:
+            f.write(content)
+        vmctl.shutdown()
+        vmctl.wait_for_shutdown()
+        vmctl.delete()
+        kwargs["haproxy_cfg"] = backup_cfg_filepath
+        return self.create_lb(**kwargs)

@@ -1,7 +1,7 @@
 import os
 import ipaddress
 
-from app.controller.node import NodeController
+from app.ctler.node import NodeController
 from app.logger import Logger
 from app.error import *
 from app import util
@@ -52,7 +52,6 @@ class WorkerService:
             net0=f"virtio,bridge={vm_network_name}",
             ipconfig0=f"ip={new_vm_ip}/24,gw={network_gw_ip}",
         )
-        wkctl.resize_disk(disk="scsi0", size="+20G")
         wkctl.startup()
         wkctl.wait_for_guest_agent()
         join_cmd = nodectl.ctlplvmctl(

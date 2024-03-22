@@ -4,7 +4,7 @@ from app import util
 from cli.core import Cmd
 from app.config import load_config
 from app.logger import Logger
-from app.controller.node import NodeController
+from app.ctler.node import NodeController
 
 
 class KubeadmCmd(Cmd):
@@ -78,7 +78,7 @@ class InitKubeCmd(Cmd):
                 svc_cidr=svc_cidr)
 
             if not cni_manifest_file:
-                log.debug("skip apply cni step")
+                log.info("skip apply cni step")
                 return
 
             cni_filepath = "/root/cni.yaml"
@@ -109,7 +109,7 @@ class InitKubeCmd(Cmd):
             svc_cidr=svc_cidr)
 
         if not cni_manifest_file:
-            log.debug("skip ini cni step")
+            log.info("skip ini cni step")
             return
 
         cni_filepath = "/root/cni.yaml"

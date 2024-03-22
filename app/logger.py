@@ -28,14 +28,14 @@ class Logger:
         if level == "DEBUG": return Logger.DEBUG
         if level == "INFO": return Logger.INFO
         if level == "WARN": return Logger.WARN
+        if level == "ERROR": return Logger.ERROR
         return Logger.ERROR
 
     def __init__(self):
         pass
 
     def error(self, *msg):
-        msg = to_string(msg)
-        print(f"{now()} [ERROR] {msg}")
+        pass
 
     def warn(self, *msg):
         pass
@@ -47,7 +47,14 @@ class Logger:
         pass
 
 
-class WarnLogger(Logger):
+class ErrorLogger(Logger):
+
+    def error(self, *msg):
+        msg = to_string(msg)
+        print(f"{now()} [ERROR] {msg}")
+
+
+class WarnLogger(ErrorLogger):
 
     def warn(self, *msg):
         msg = to_string(msg)
@@ -68,7 +75,7 @@ class DebugLogger(InfoLogger):
         print(f"{now()} [DEBUG] {msg}")
 
 
-Logger.ERROR = Logger()
+Logger.ERROR = ErrorLogger()
 Logger.WARN = WarnLogger()
 Logger.INFO = InfoLogger()
 Logger.DEBUG = DebugLogger()
