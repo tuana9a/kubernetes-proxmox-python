@@ -1,4 +1,4 @@
-# kubernetes-proxmox-cluster-autoscaler
+# kubernetes-proxmox-python
 
 # Prepare the network for vm
 
