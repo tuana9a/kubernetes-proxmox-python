@@ -10,10 +10,12 @@ from app.ctler.node import NodeController
 class KubeadmCmd(Cmd):
 
     def __init__(self) -> None:
-        super().__init__("kubeadm", childs=[
-            ResetKubeCmd(),
-            InitKubeCmd(),
-        ], aliases=["adm"])
+        super().__init__("kubeadm",
+                         childs=[
+                             ResetKubeCmd(),
+                             InitKubeCmd(),
+                         ],
+                         aliases=["adm"])
 
 
 class ResetKubeCmd(Cmd):
@@ -29,7 +31,7 @@ class ResetKubeCmd(Cmd):
         vm_id = args.vmid
         urllib3.disable_warnings()
         log = Logger.from_env()
-
+        log.info("vm_id", vm_id)
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
         proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
@@ -52,6 +54,7 @@ class InitKubeCmd(Cmd):
         args = self.parsed_args
         vm_id = args.vmid
         cfg = load_config(log=log)
+        log.info("vm_id", vm_id)
         proxmox_node = cfg["proxmox_node"]
         load_balancer_vm_id = cfg.get("load_balancer_vm_id", None)
         pod_cidr = cfg["pod_cidr"]

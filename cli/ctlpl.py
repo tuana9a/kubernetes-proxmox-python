@@ -56,10 +56,6 @@ class DeleteControlPlaneCmd(Cmd):
         args = self.parsed_args
         vm_id = args.vmid or os.getenv("VMID")
         log.info("vm_id", vm_id)
-
-        if not vm_id:
-            raise ValueError("vm_id is missing")
-
         proxmox_node = cfg["proxmox_node"]
         proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
         nodectl = NodeController(proxmox_client, proxmox_node, log=log)
@@ -84,7 +80,7 @@ class CatKubeConfigCmd(Cmd):
         filepath = args.file_path
         urllib3.disable_warnings()
         log = Logger.from_env()
-
+        log.info("vm_id", vm_id)
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
         proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
@@ -109,14 +105,12 @@ class CopyKubeCertsCmd(Cmd):
         dest_id = args.dest
         urllib3.disable_warnings()
         log = Logger.from_env()
-
+        log.info("src", source_id, "dest", dest_id)
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
         proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
         nodectl = NodeController(proxmox_client, proxmox_node, log=log)
-
         nodectl.ctlplvmctl(dest_id).ensure_cert_dirs()
-
         service = ControlPlaneService(nodectl, log=log)
         service.copy_kube_certs(source_id, dest_id)
 
@@ -136,7 +130,7 @@ class JoinControlPlaneCmd(Cmd):
         args = self.parsed_args
         control_plane_id = args.ctlplid
         control_plane_ids = args.ctlplids
-
+        log.info("dad", control_plane_id, "childs", control_plane_ids)
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
         proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
@@ -144,8 +138,8 @@ class JoinControlPlaneCmd(Cmd):
         service = ControlPlaneService(nodectl, log=log)
         load_balancer_vm_id = cfg["load_balancer_vm_id"]
         lbctl = nodectl.lbctl(load_balancer_vm_id)
-        join_cmd = nodectl.ctlplvmctl(control_plane_id).kubeadm(
-        ).create_join_command(is_control_plane=True)
+        dadctl = nodectl.ctlplvmctl(control_plane_id)
+        join_cmd = dadctl.kubeadm().create_join_command(is_control_plane=True)
         for id in control_plane_ids:
             ctlplvmctl = nodectl.ctlplvmctl(id)
             ctlplvmctl.ensure_cert_dirs()

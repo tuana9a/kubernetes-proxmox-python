@@ -25,4 +25,5 @@ mount --bind /sys /mnt/sys
 chroot /mnt
 grub-install /dev/sda
 exit
+exit
 ```

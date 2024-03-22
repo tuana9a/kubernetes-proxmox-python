@@ -13,5 +13,4 @@ def load_config(config_path=os.getenv("CONFIG_PATH"), log=Logger.DEBUG):
         return json.loads(f.read())
 
 
-KUBECONFIG = "/etc/kubernetes/admin.conf"
 TIMEOUT = 30 * 60  # 30 min

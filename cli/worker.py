@@ -52,15 +52,10 @@ class DeleteWorkerCmd(Cmd):
         args = self.parsed_args
         vm_id = args.vmid or os.getenv("VMID")
         log.info("vm_id", vm_id)
-
-        if not vm_id:
-            raise ValueError("vm_id is missing")
-
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
         proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
         nodectl = NodeController(proxmox_client, proxmox_node, log=log)
-
         service = WorkerService(nodectl, log=log)
         service.delete_worker(vm_id, **cfg)
 
@@ -80,12 +75,12 @@ class JoinWorkerCmd(Cmd):
         args = self.parsed_args
         worker_ids = args.workerids
         control_plane_id = args.ctlplid
+        log.info("ctlpl", control_plane_id, "workers", worker_ids)
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
         proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
         nodectl = NodeController(proxmox_client, proxmox_node, log=log)
-
-        join_cmd = nodectl.ctlplvmctl(
-            control_plane_id).kubeadm().create_join_command()
+        ctlctl = nodectl.ctlplvmctl(control_plane_id)
+        join_cmd = ctlctl.kubeadm().create_join_command()
         for id in worker_ids:
             nodectl.wkctl(id).exec(join_cmd)

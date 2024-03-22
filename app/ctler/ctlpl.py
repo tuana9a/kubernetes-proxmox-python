@@ -15,7 +15,7 @@ class ControlPlaneVmController(KubeVmController):
 
     def drain_node(self,
                    node_name: str,
-                   kubeconfig_filepath=config.KUBECONFIG):
+                   kubeconfig_filepath="/etc/kubernetes/admin.conf"):
         cmd = [
             "kubectl", f"--kubeconfig={kubeconfig_filepath}", "drain",
             "--ignore-daemonsets", node_name
@@ -23,7 +23,9 @@ class ControlPlaneVmController(KubeVmController):
         # 30 mins should be enough
         return self.exec(cmd, interval_check=5, timeout=30 * 60)
 
-    def delete_node(self, node_name, kubeconfig_filepath=config.KUBECONFIG):
+    def delete_node(self,
+                    node_name,
+                    kubeconfig_filepath="/etc/kubernetes/admin.conf"):
         cmd = [
             "kubectl", f"--kubeconfig={kubeconfig_filepath}", "delete", "node",
             node_name
@@ -34,11 +36,13 @@ class ControlPlaneVmController(KubeVmController):
         for d in dirs:
             self.exec(["mkdir", "-p", d], interval_check=3)
 
-    def cat_kubeconfig(self, filepath=config.KUBECONFIG):
+    def cat_kubeconfig(self, filepath="/etc/kubernetes/admin.conf"):
         cmd = ["cat", filepath]
         return self.exec(cmd)
 
-    def apply_file(self, filepath: str, kubeconfig_filepath=config.KUBECONFIG):
+    def apply_file(self,
+                   filepath: str,
+                   kubeconfig_filepath="/etc/kubernetes/admin.conf"):
         cmd = [
             "kubectl", "apply", f"--kubeconfig={kubeconfig_filepath}", "-f",
             filepath

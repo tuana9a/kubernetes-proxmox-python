@@ -10,7 +10,12 @@ from app.ctler.node import NodeController
 class VmCmd(Cmd):
 
     def __init__(self) -> None:
-        super().__init__("vm", childs=[RebootVmCmd(), RemoveVmCmd(), StartVmCmd(), CopyFileCmd()])
+        super().__init__(
+            "vm",
+            childs=[RebootVmCmd(),
+                    RemoveVmCmd(),
+                    StartVmCmd(),
+                    CopyFileCmd()])
 
 
 class RebootVmCmd(Cmd):
@@ -26,6 +31,7 @@ class RebootVmCmd(Cmd):
         args = self.parsed_args
         log = Logger.from_env()
         ids = args.ids
+        log.info("vm_ids", ids)
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
         proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
@@ -48,6 +54,7 @@ class RemoveVmCmd(Cmd):
         args = self.parsed_args
         log = Logger.from_env()
         ids = args.ids
+        log.info("vm_ids", ids)
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
         proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
@@ -58,10 +65,11 @@ class RemoveVmCmd(Cmd):
             vmctl.wait_for_shutdown()
             vmctl.delete()
 
+
 class StartVmCmd(Cmd):
 
     def __init__(self) -> None:
-        super().__init__("start", aliases=["run","up"])
+        super().__init__("start", aliases=["run", "up"])
 
     def _setup(self):
         self.parser.add_argument("ids", nargs="+")
@@ -71,6 +79,7 @@ class StartVmCmd(Cmd):
         args = self.parsed_args
         log = Logger.from_env()
         ids = args.ids
+        log.info("vm_ids", ids)
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
         proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
@@ -80,7 +89,9 @@ class StartVmCmd(Cmd):
             vmctl.startup()
             vmctl.wait_for_guest_agent()
 
+
 class CopyFileCmd(Cmd):
+
     def __init__(self) -> None:
         super().__init__("copy-file", aliases=["cp"])
 
@@ -96,11 +107,12 @@ class CopyFileCmd(Cmd):
         vm_id = args.vmid
         urllib3.disable_warnings()
         log = Logger.from_env()
+        log.info("vm_id", vm_id)
         cfg = load_config(log=log)
         proxmox_node = cfg["proxmox_node"]
         proxmox_client = NodeController.create_proxmox_client(**cfg, log=log)
         nodectl = NodeController(proxmox_client, proxmox_node, log=log)
         vmctl = nodectl.vmctl(vm_id)
         log.info(localpath, "->", path)
-        with open(localpath, "r",encoding="utf-8") as f:
+        with open(localpath, "r", encoding="utf-8") as f:
             vmctl.write_file(path, f.read())

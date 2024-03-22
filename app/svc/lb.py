@@ -76,8 +76,8 @@ class LbService:
         vmctl = nodectl.vmctl(old_vm_id)
         r = vmctl.read_file("/etc/haproxy/haproxy.cfg")
         content = r["content"]
-        log.info("content", content)
         backup_cfg_filepath = f"/tmp/haproxy-{time.time_ns()}.cfg"
+        log.info("backup", backup_cfg_filepath)
         with open(backup_cfg_filepath, "w") as f:
             f.write(content)
         vmctl.shutdown()
