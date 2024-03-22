@@ -110,7 +110,7 @@ class BackendCmd(Cmd):
                          aliases=["be"])
 
     def _setup(self):
-        self.parser.add_argument('backend', help='Backend name')
+        self.parser.add_argument('backend_name', help='Backend name')
 
 
 class AddBackendCmd(Cmd):
@@ -127,7 +127,7 @@ class AddBackendCmd(Cmd):
 
     def _run(self):
         config_path = self.parent.parent.parsed_args.config
-        backend_name = self.parent.parsed_args.backend
+        backend_name = self.parent.parsed_args.backend_name
         server_name = self.parsed_args.name
         server_endpoint = self.parsed_args.endpoint
 
@@ -137,7 +137,7 @@ class AddBackendCmd(Cmd):
         print("server_endpoint", server_endpoint)
 
         with open(config_path, "r", encoding="utf-8") as f:
-            content = f.read()
+            content = f.read().strip()
 
         target_server_name = server_name
         target_server_endpoint = server_endpoint
@@ -148,7 +148,6 @@ class AddBackendCmd(Cmd):
         current_line_number = 0
         tab_size = " " * 2  # two spaces
         is_need_to_save = False
-        found_backend_line_number = None
 
         while current_line_number < line_count:
             line = lines[current_line_number]
@@ -165,7 +164,6 @@ class AddBackendCmd(Cmd):
             print(
                 f"found backend: \"{target_backend_name}\" at line {current_line_number}"
             )
-            found_backend_line_number = current_line_number
             current_line_number += 1
             is_server_existed = False
             while (current_line_number < line_count):
@@ -230,14 +228,14 @@ class RmBackendCmd(Cmd):
 
     def _run(self):
         config_path = self.parent.parent.parsed_args.config
-        backend_name = self.parent.parsed_args.backend
+        backend_name = self.parent.parsed_args.backend_name
         server_name = self.parsed_args.name
         print("config_path", config_path)
         print("backend_name", backend_name)
         print("server_name", server_name)
 
         with open(config_path, "r", encoding="utf-8") as f:
-            content = f.read()
+            content = f.read().strip()
 
         target_server_name = server_name
         target_backend_name = backend_name
